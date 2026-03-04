@@ -1,79 +1,26 @@
-# Nuxt Minimal Starter
+# airbuddy-spa
+The web app for the airBuddy project, running on node, epxress and nuxt.  
 
-Here we get going with the REAL airBuddy website!
+Phase A — Start UI immediately (no DB work yet)
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Develop Nuxt locally
 
+Deploy static output to /var/www/airbuddy-air2/
 
+Keep air2 /api → 127.0.0.1:3000 for now
 
-## Setup
+Build the UI using whatever endpoints already exist
 
-Make sure to install dependencies:
+Phase B — Stand up “air2 API + air2 DB”
 
-```bash
-# npm
-npm install
+Create new MySQL database and user (server-side)
 
-# pnpm
-pnpm install
+Fork/copy your Express API into a new folder
 
-# yarn
-yarn install
+Point it to the new DB
 
-# bun
-bun install
-```
+Run migrations for new schema
 
-## Development Server
+Run that API on port 3002 (systemd service)
 
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Update Nginx: air2 /api → 127.0.0.1:3002
