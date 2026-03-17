@@ -181,7 +181,7 @@ const en = {
   footer: {
     tagline: 'Home-first air intelligence. Open source, always.',
     links: [
-      { label: 'Dashboard', to: '/dashboard' },
+      { label: 'Dashboard', to: '/' },
       { label: 'GitHub', to: 'https://github.com/russs95/airbuddy-spa', target: '_blank' },
     ],
     legal: 'Open source. Built with ❤️ for clean air.',
@@ -362,7 +362,7 @@ const id = {
   footer: {
     tagline: 'Kecerdasan udara untuk rumah. Open source, selalu.',
     links: [
-      { label: 'Dasbor', to: '/dashboard' },
+      { label: 'Dasbor', to: '/' },
       { label: 'GitHub', to: 'https://github.com/russs95/airbuddy-spa', target: '_blank' },
     ],
     legal: 'Open source. Dibangun dengan ❤️ untuk udara bersih.',
@@ -370,13 +370,6 @@ const id = {
 }
 
 const copy = computed(() => lang.value === 'id' ? id : en)
-
-// ─── Auth redirect ─────────────────────────────────────────────────────────────
-// If the user is already authenticated, send them straight to the dashboard.
-const { data: me } = await useFetch('/api/me', { credentials: 'include' })
-if (me.value?.ok) {
-  await navigateTo('/dashboard')
-}
 
 // ─── Color mode ───────────────────────────────────────────────────────────────
 const colorMode = useColorMode()
@@ -391,7 +384,7 @@ function toggleDark() {
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- HEADER                                                                  -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <UHeader :to="'/'" :title="'AirBuddy'">
+  <UHeader :to="'/landing-beta'" :title="'AirBuddy'">
     <template #title>
       <img src="/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-8 lp:w-auto" />
     </template>
@@ -441,7 +434,7 @@ function toggleDark() {
 
         <!-- Login button -->
         <UButton
-          to="/api/auth/login"
+          to="https://air2.earthen.io/api/auth/login"
           color="neutral"
           variant="outline"
           size="sm"
@@ -745,7 +738,7 @@ function toggleDark() {
       <div class="lp:text-center lp:p-8">
         <UIcon name="i-lucide-monitor" class="lp:w-16 lp:h-16 lp:text-orange-300 dark:lp:text-orange-700 lp:mx-auto lp:mb-4" />
         <p class="lp:text-sm lp:text-gray-400 dark:lp:text-gray-500">Dashboard screenshot coming soon</p>
-        <UButton to="/dashboard" variant="outline" color="primary" size="sm" class="lp:mt-4" icon="i-lucide-external-link">
+        <UButton to="/" variant="outline" color="primary" size="sm" class="lp:mt-4" icon="i-lucide-external-link">
           Open Live Dashboard
         </UButton>
       </div>
@@ -784,7 +777,7 @@ function toggleDark() {
     :description="copy.finalCta.description"
     :links="[
       { label: copy.finalCta.ctaBuild, to: 'https://github.com/russs95/airbuddy_v2', target: '_blank', color: 'primary', size: 'xl', icon: 'i-lucide-hammer' },
-      { label: copy.finalCta.ctaDashboard, to: '/dashboard', color: 'neutral', variant: 'outline', size: 'xl', icon: 'i-lucide-layout-dashboard' },
+      { label: copy.finalCta.ctaDashboard, to: '/', color: 'neutral', variant: 'outline', size: 'xl', icon: 'i-lucide-layout-dashboard' },
     ]"
   />
   -->
