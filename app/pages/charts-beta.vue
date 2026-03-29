@@ -2,7 +2,7 @@
   <main class="wrap" :data-theme="theme">
     <header class="header">
       <div class="brandBlock">
-        <img class="logo" src="/airbuddy-logo.svg" alt="AirBuddy" />
+        <img class="logo" src="/svgs/airbuddy-logo.svg" alt="AirBuddy" />
 
         <div class="brandText">
           <p class="sub">Home-first air intelligence • air2 staging</p>

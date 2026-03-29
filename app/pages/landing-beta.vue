@@ -386,7 +386,7 @@ function toggleDark() {
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <UHeader :to="'/landing-beta'" :title="'AirBuddy'">
     <template #title>
-      <img src="/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-8 lp:w-auto" />
+      <img src="/svgs/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-8 lp:w-auto" />
     </template>
 
     <!-- Centre nav (desktop) -->
@@ -458,8 +458,21 @@ function toggleDark() {
       </div>
     </template>
 
+    <!-- Explicit hamburger toggle (mobile only) -->
+    <template #toggle="{ open, toggle: toggleMenu }">
+      <UButton
+        :icon="open ? 'i-lucide-x' : 'i-lucide-menu'"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        class="lp:flex lp:lg:hidden"
+        aria-label="Open menu"
+        @click="toggleMenu"
+      />
+    </template>
+
     <!-- Mobile hamburger panel -->
-    <template #panel>
+    <template #body>
       <nav class="lp:flex lp:flex-col lp:gap-1 lp:p-4">
         <p class="lp:text-xs lp:font-semibold lp:uppercase lp:tracking-widest lp:text-gray-400 dark:lp:text-gray-500 lp:px-3 lp:pb-2 lp:pt-1">
           Project Links
@@ -788,7 +801,7 @@ function toggleDark() {
   <UFooter>
     <template #left>
       <div class="lp:flex lp:items-center lp:gap-3">
-        <img src="/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-6 lp:w-auto" />
+        <img src="/svgs/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-6 lp:w-auto" />
         <span class="lp:text-sm lp:text-gray-500 dark:lp:text-gray-400">
           {{ copy.footer.tagline }}
         </span>

@@ -11,13 +11,13 @@ const en = {
     features: 'Features',
     howItWorks: 'How It Works',
     openSource: 'Open Source',
-    buildYourOwn: 'Build Your Own',
+    signUp: 'Sign Up',
   },
   hero: {
     headline: 'Open Source Air Quality Monitoring',
     title: 'Know thy air.',
     description:
-      'AirBuddy is an open source air quality monitor you can build yourself. Track CO₂, temperature, humidity, and VOCs in your home and community. Understand your air. Own what you build.',
+      'AirBuddy is an open source air quality monitor you can build yourself. Connect it online here and track the air quality in your home and community over time. Understand your air. Own what you build.',
     ctaBuild: 'Build Your Own',
     ctaDashboard: 'Register Account',
     valueStrip: ['Affordable', 'Hackable', 'Open Source', 'Community-Deployable'],
@@ -193,13 +193,13 @@ const id = {
     features: 'Fitur',
     howItWorks: 'Cara Kerja',
     openSource: 'Open Source',
-    buildYourOwn: 'Buat Sendiri',
+    signUp: 'Daftar',
   },
   hero: {
     headline: 'Pemantauan Kualitas Udara Open Source',
     title: 'Kenali udaramu.',
     description:
-      'AirBuddy adalah monitor kualitas udara open source yang bisa Anda bangun sendiri. Pantau CO₂, suhu, kelembaban, dan VOC di rumah dan komunitas Anda. Pahami udara Anda. Miliki apa yang Anda bangun.',
+      'AirBuddy adalah monitor kualitas udara open source yang bisa Anda bangun sendiri. Hubungkan secara online di sini dan pantau kualitas udara di rumah dan komunitas Anda dari waktu ke waktu. Pahami udara Anda. Miliki apa yang Anda bangun.',
     ctaBuild: 'Buat Sendiri',
     ctaDashboard: 'Daftar Akun',
     valueStrip: ['Terjangkau', 'Hackable', 'Open Source', 'Untuk Komunitas'],
@@ -371,12 +371,14 @@ const id = {
 
 const copy = computed(() => lang.value === 'id' ? id : en)
 
-// ─── Auth redirect ─────────────────────────────────────────────────────────────
-// If the user is already authenticated, send them straight to the dashboard.
+// ─── Auth state ────────────────────────────────────────────────────────────────
 const { data: me } = await useFetch('/api/me', { credentials: 'include' })
-if (me.value?.ok) {
-  await navigateTo('/dashboard')
-}
+
+const loginHref = computed(() =>
+  me.value?.ok
+    ? '/dashboard'
+    : 'https://buwana.ecobricks.org/en/login.php?app=airb_ca090536efc8&app=airb_ca090536efc8'
+)
 
 // ─── Color mode ───────────────────────────────────────────────────────────────
 const colorMode = useColorMode()
@@ -391,9 +393,11 @@ function toggleDark() {
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- HEADER                                                                  -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <UHeader :to="'/'" :title="'AirBuddy'">
+  <UHeader :to="'/'" :title="'AirBuddy'" toggle-side="left" :ui="{ content: 'ab-header-panel' }">
     <template #title>
-      <img src="/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-8 lp:w-auto" />
+      <img v-if="isDark" src="/svgs/airbuddy-logo-dark.svg" alt="AirBuddy" class="lp:hidden lp:sm:block lp:h-8 lp:w-auto" />
+      <img v-else src="/svgs/airbuddy-logo-light.svg" alt="AirBuddy" class="lp:hidden lp:sm:block lp:h-8 lp:w-auto" />
+      <img src="/svgs/ab-icon.svg" alt="AirBuddy" class="lp:block lp:sm:hidden lp:h-8 lp:w-8" />
     </template>
 
     <!-- Centre nav (desktop) -->
@@ -441,70 +445,99 @@ function toggleDark() {
 
         <!-- Login button -->
         <UButton
-          to="/api/auth/login"
+          :to="loginHref"
           color="neutral"
           variant="outline"
           size="sm"
           icon="i-lucide-log-in"
         >
-          Login
+          {{ me?.ok ? 'Dashboard' : 'Login' }}
         </UButton>
 
-        <!-- GitHub CTA -->
+        <!-- Sign Up CTA -->
         <UButton
-          to="https://github.com/russs95/airbuddy_v2"
+          to="https://buwana.ecobricks.org/en/signup-1.php?app=airb_ca090536efc8"
           target="_blank"
           color="primary"
           variant="solid"
           size="sm"
-          icon="i-lucide-github"
+          icon="i-lucide-user-plus"
           class="lp:hidden lp:sm:flex"
         >
-          {{ copy.nav.buildYourOwn }}
+          {{ copy.nav.signUp }}
         </UButton>
       </div>
     </template>
 
+    <!-- Explicit hamburger toggle (mobile only) -->
+    <template #toggle="{ open, toggle: toggleMenu }">
+      <UButton
+        :icon="open ? 'i-lucide-x' : 'i-lucide-menu'"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        class="lp:flex"
+        aria-label="Open menu"
+        @click="toggleMenu"
+      />
+    </template>
+
     <!-- Mobile hamburger panel -->
-    <template #panel>
+    <template #body>
       <nav class="lp:flex lp:flex-col lp:gap-1 lp:p-4">
+        <!-- Navigation -->
         <p class="lp:text-xs lp:font-semibold lp:uppercase lp:tracking-widest lp:text-gray-400 dark:lp:text-gray-500 lp:px-3 lp:pb-2 lp:pt-1">
-          Project Links
+          Navigation
         </p>
-        <a href="https://github.com/russs95/airbuddy_v2" target="_blank"
+        <NuxtLink to="/"
           class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
-          <UIcon name="i-lucide-cpu" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
-          Firmware Repo
-        </a>
-        <a href="https://github.com/russs95/airbuddy-spa" target="_blank"
-          class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
-          <UIcon name="i-lucide-globe" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
-          Site Repo
-        </a>
-        <a href="https://github.com/russs95/airbuddy-online" target="_blank"
-          class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
-          <UIcon name="i-lucide-server" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
-          API Repo
-        </a>
-        <a href="https://air2.earthen.io/dashboard" target="_blank"
+          <UIcon name="i-lucide-home" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
+          Home
+        </NuxtLink>
+        <NuxtLink to="/dashboard"
           class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
           <UIcon name="i-lucide-layout-dashboard" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
           Dashboard
-        </a>
-        <a href="https://buwana.ecobricks.org/en/signup-1.php?app=airb_ca090536efc8&id=150" target="_blank"
+        </NuxtLink>
+
+        <!-- Project Docs -->
+        <p class="lp:text-xs lp:font-semibold lp:uppercase lp:tracking-widest lp:text-gray-400 dark:lp:text-gray-500 lp:px-3 lp:pb-2 lp:pt-3">
+          Project Docs
+        </p>
+        <a href="https://github.com/russs95/airbuddy_v2" target="_blank"
           class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
-          <UIcon name="i-lucide-user-plus" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
-          AB Account Registration
+          <UIcon name="i-lucide-info" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
+          About the Project
         </a>
-        <a href="https://github.com/russs95/airbuddy_v2/wiki/Pico-Wiring" target="_blank"
+        <a href="https://github.com/russs95/airbuddy_v2/wiki/components" target="_blank"
           class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
-          <UIcon name="i-lucide-cable" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
-          Wiring Wiki
+          <UIcon name="i-lucide-package" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
+          What You Need
         </a>
         <a href="https://github.com/russs95/airbuddy_v2/wiki/AirBuddy-First%E2%80%90Time-Setup-Guide" target="_blank"
           class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
           <UIcon name="i-lucide-book-open" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
           First Time Setup
+        </a>
+        <a href="https://github.com/russs95/airbuddy_v2/wiki/Pico-Wiring" target="_blank"
+          class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
+          <UIcon name="i-lucide-cable" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
+          Pico Wiring Guide
+        </a>
+        <a href="https://github.com/russs95/airbuddy_v2/wiki/AirBuddy-First%E2%80%90Time-Setup-Guide#esp32-wiring-guide" target="_blank"
+          class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
+          <UIcon name="i-lucide-circuit-board" class="lp:w-4 lp:h-4 lp:text-orange-400 lp:flex-shrink-0" />
+          ESP32 Wiring Guide
+        </a>
+        <a href="https://air2.earthen.io/example" target="_blank"
+          class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
+          <UIcon name="i-lucide-activity" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
+          AirBuddy Live Example
+        </a>
+        <a href="https://github.com/russs95/airbuddy_v2/wiki/air.Earthen.io-API" target="_blank"
+          class="lp:flex lp:items-center lp:gap-3 lp:px-3 lp:py-2.5 lp:rounded-lg lp:text-sm lp:text-gray-700 dark:lp:text-gray-200 lp:hover:bg-gray-100 dark:lp:hover:bg-gray-800 lp:transition-colors">
+          <UIcon name="i-lucide-server" class="lp:w-4 lp:h-4 lp:text-cyan-400 lp:flex-shrink-0" />
+          API GitHub Repo
         </a>
       </nav>
     </template>
@@ -530,7 +563,7 @@ function toggleDark() {
       <h1 class="lp-hero-title lp:font-bold lp:mb-8 lp:text-gray-900">
         {{ copy.hero.title }}
       </h1>
-      <p class="lp-hero-desc lp:text-lg lp:md:text-xl lp:leading-relaxed lp:mb-10 lp:text-gray-600 dark:lp:text-gray-300 lp:max-w-2xl lp:mx-auto">
+      <p class="lp-hero-desc lp:text-lg lp:md:text-xl lp:leading-relaxed lp:mb-10 lp:text-gray-600 lp:max-w-2xl lp:mx-auto lp-hero-desc-text">
         {{ copy.hero.description }}
       </p>
 
@@ -541,7 +574,7 @@ function toggleDark() {
           target="_blank"
           color="primary"
           size="xl"
-          icon="i-lucide-hammer"
+          icon="i-lucide-github"
         >
           {{ copy.hero.ctaBuild }}
         </UButton>
@@ -562,7 +595,7 @@ function toggleDark() {
         <span
           v-for="value in copy.hero.valueStrip"
           :key="value"
-          class="lp:inline-flex lp:items-center lp:gap-1.5 lp:px-3 lp:py-1.5 lp:rounded-full lp:text-sm lp:font-medium lp:bg-white/60 dark:lp:bg-slate-800/60 lp:text-cyan-700 dark:lp:text-cyan-300 lp:border lp:border-cyan-200 dark:lp:border-cyan-800 lp:backdrop-blur-sm"
+          class="lp:inline-flex lp:items-center lp:gap-1.5 lp:px-3 lp:py-1.5 lp:rounded-full lp:text-sm lp:font-medium lp-value-pill lp:backdrop-blur-sm"
         >
           <UIcon name="i-lucide-check" class="lp:w-3.5 lp:h-3.5" />
           {{ value }}
@@ -608,7 +641,7 @@ function toggleDark() {
   >
     <div class="lp:grid lp:md:grid-cols-3 lp:gap-8 lp:mt-8">
       <!-- Step 01 — Build the device -->
-      <div class="lp:relative lp:flex lp:flex-col lp:gap-4 lp:p-6 lp:rounded-2xl lp:border lp:border-gray-200 dark:lp:border-gray-800 lp:bg-white dark:lp:bg-gray-900">
+      <div class="lp:relative lp:flex lp:flex-col lp:gap-4 lp:p-6 lp:rounded-2xl lp-step-card">
         <span class="lp:text-4xl lp:font-black lp:text-orange-200 dark:lp:text-orange-900 lp:leading-none lp:select-none">
           {{ copy.howItWorks.steps[0].number }}
         </span>
@@ -632,7 +665,7 @@ function toggleDark() {
       </div>
 
       <!-- Step 02 — Register & connect -->
-      <div class="lp:relative lp:flex lp:flex-col lp:gap-4 lp:p-6 lp:rounded-2xl lp:border lp:border-gray-200 dark:lp:border-gray-800 lp:bg-white dark:lp:bg-gray-900">
+      <div class="lp:relative lp:flex lp:flex-col lp:gap-4 lp:p-6 lp:rounded-2xl lp-step-card">
         <span class="lp:text-4xl lp:font-black lp:text-orange-200 dark:lp:text-orange-900 lp:leading-none lp:select-none">
           {{ copy.howItWorks.steps[1].number }}
         </span>
@@ -656,7 +689,7 @@ function toggleDark() {
       </div>
 
       <!-- Step 03 — Read & share -->
-      <div class="lp:relative lp:flex lp:flex-col lp:gap-4 lp:p-6 lp:rounded-2xl lp:border lp:border-gray-200 dark:lp:border-gray-800 lp:bg-white dark:lp:bg-gray-900">
+      <div class="lp:relative lp:flex lp:flex-col lp:gap-4 lp:p-6 lp:rounded-2xl lp-step-card">
         <span class="lp:text-4xl lp:font-black lp:text-orange-200 dark:lp:text-orange-900 lp:leading-none lp:select-none">
           {{ copy.howItWorks.steps[2].number }}
         </span>
@@ -795,7 +828,8 @@ function toggleDark() {
   <UFooter>
     <template #left>
       <div class="lp:flex lp:items-center lp:gap-3">
-        <img src="/airbuddy-logo.svg" alt="AirBuddy" class="lp:h-6 lp:w-auto" />
+        <img v-if="isDark" src="/svgs/airbuddy-logo-dark.svg" alt="AirBuddy" class="lp:h-6 lp:w-auto" />
+        <img v-else src="/svgs/airbuddy-logo-light.svg" alt="AirBuddy" class="lp:h-6 lp:w-auto" />
         <span class="lp:text-sm lp:text-gray-500 dark:lp:text-gray-400">
           {{ copy.footer.tagline }}
         </span>
@@ -826,6 +860,20 @@ function toggleDark() {
 </template>
 
 <style>
+/* ─── Header menu panel width ───────────────────────────────────────────── */
+/* Full-width on mobile, sidebar-style on tablet/desktop */
+.ab-header-panel {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+@media (min-width: 769px) {
+  .ab-header-panel {
+    width: 25vw !important;
+    min-width: 260px !important;
+    max-width: 480px !important;
+  }
+}
+
 /* ─── Landing page font foundation ─────────────────────────────────────── */
 /* Wrapping div .lp-landing-page scopes these rules to this page only       */
 .lp-landing-page {
@@ -1036,4 +1084,34 @@ function toggleDark() {
   animation: lp-drift-1 24s ease-in-out infinite reverse;
 }
 .dark .lp-fblob-sky { opacity: 0.13; }
+
+/* ─── Hero description text ─────────────────────────────────────────────── */
+.lp-hero-desc-text {
+  color: #4b5563; /* gray-600 */
+}
+.dark .lp-hero-desc-text {
+  color: #f1f5f9; /* slate-100 — bright and legible on dark hero bg */
+}
+
+/* ─── Value strip pills ──────────────────────────────────────────────────── */
+.lp-value-pill {
+  background: rgba(255, 255, 255, 0.70);
+  color: #0e7490; /* cyan-700 */
+  border: 1px solid #7dd3fc; /* sky-300 */
+}
+.dark .lp-value-pill {
+  background: rgba(8, 145, 178, 0.25); /* cyan-600 at 25% */
+  color: #a5f3fc; /* cyan-200 */
+  border: 1px solid #22d3ee; /* cyan-400 */
+}
+
+/* ─── How It Works step cards ────────────────────────────────────────────── */
+.lp-step-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb; /* gray-200 */
+}
+.dark .lp-step-card {
+  background: #18181b; /* zinc-900 */
+  border: 1px solid #3f3f46; /* zinc-700 */
+}
 </style>

@@ -83,6 +83,7 @@ const props = withDefaults(defineProps<{
 
 const RANGE_HOURS: Record<string, number> = {
   '15m': 0.25, '30m': 0.5, '1h': 1, '3h': 3, '6h': 6, '12h': 12, '24h': 24,
+  '36h': 36, '72h': 72, '7d': 168, '30d': 720,
 }
 
 const windowStartSec = computed(() => {
@@ -238,10 +239,16 @@ const chartOption = computed(() => {
       axisLabel: {
         color: c.axisLabel,
         fontSize: 11,
-        formatter: (val: number) =>
-          new Intl.DateTimeFormat('en-GB', {
-            hour: '2-digit', minute: '2-digit', hour12: false,
-          }).format(new Date(val)),
+        formatter: (val: number) => {
+          const hours = RANGE_HOURS[props.range ?? '1h'] ?? 1
+          if (hours >= 168) {
+            return new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric' }).format(new Date(val))
+          }
+          if (hours >= 24) {
+            return new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(val))
+          }
+          return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(val))
+        },
       },
       splitLine: { show: false },
     },

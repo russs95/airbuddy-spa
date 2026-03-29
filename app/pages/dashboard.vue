@@ -1,9 +1,16 @@
 <template>
   <main class="wrap" :data-theme="theme">
     <header class="header">
-      <div>
-        <h1>Dashboard</h1>
-        <p class="muted">AirBuddy account, homes, rooms, and device setup</p>
+      <div class="headerLeft">
+        <NuxtLink to="/" class="abIconLink" title="AirBuddy Home">
+          <img src="/svgs/ab-icon.svg" alt="AirBuddy" class="abIcon abIconMobile" />
+          <img v-if="theme === 'dark'" src="/svgs/airbuddy-logo-dark.svg" alt="AirBuddy" class="abLogo abLogoDesktop" />
+          <img v-else src="/svgs/airbuddy-logo-light.svg" alt="AirBuddy" class="abLogo abLogoDesktop" />
+        </NuxtLink>
+        <div>
+          <h1>Dashboard</h1>
+          <p class="muted">AirBuddy account, homes, rooms, and device setup</p>
+        </div>
       </div>
 
       <div class="btns">
@@ -15,6 +22,12 @@
           {{ theme === "dark" ? "☀️" : "🌙" }}
         </button>
         <NuxtLink class="btn" to="/">Home</NuxtLink>
+        <a class="btn btnGithub" href="https://github.com/russs95/airbuddy_v2" target="_blank" rel="noopener">
+          <svg class="githubIcon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          Build
+        </a>
         <a v-if="!me?.ok" class="btn" href="/api/auth/login">Login</a>
         <button class="btn danger" @click="logout" :disabled="logoutPending">
           {{ logoutPending ? "Logging out..." : "Logout" }}
@@ -101,167 +114,143 @@
       </div>
     </section>
 
-    <!-- eCO₂ chart card -->
-    <section v-if="me?.ok" class="card chartTopCard">
-      <div class="chartCardHead">
-        <span class="chartCardTitle">eCO₂</span>
-        <div class="chartCardControls">
-          <div class="rangeBar" role="group" aria-label="eCO₂ time range">
-            <button
-                v-for="r in trendRangeKeys"
-                :key="r"
-                class="rangeBtn"
-                :class="{ active: chartRanges.eco2 === r }"
-                @click="chartRanges.eco2 = r"
-            >{{ r }}</button>
-          </div>
+    <!-- Charts panel — all sensors with shared range controls -->
+    <section v-if="me?.ok" class="card chartsPanel">
+      <div class="chartsPanelHead">
+        <span class="chartsPanelTitle">Air Quality Trends</span>
+        <div class="rangeBar" role="group" aria-label="Time range">
           <button
-              class="rangeBtn expandBtn"
-              @click="chartExpanded.eco2 = !chartExpanded.eco2"
-              :title="chartExpanded.eco2 ? 'Collapse chart' : 'Expand chart'"
-              :aria-pressed="chartExpanded.eco2"
-          >{{ chartExpanded.eco2 ? '⊟' : '⊞' }}</button>
+              v-for="r in trendRangeKeys"
+              :key="r"
+              class="rangeBtn"
+              :class="{ active: universalRange === r }"
+              @click="universalRange = r"
+          >{{ r }}</button>
         </div>
       </div>
-      <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
-      <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
-      <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
-      <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
-      <AirTrendChart
-          v-else
-          :timestamps="trends.timestamps"
-          :series="[{ name: 'eCO₂', color: '#6a1b9a', values: trends.eco2s }]"
-          :range="chartRanges.eco2"
-          :theme="theme"
-          unit="ppm"
-          :decimals="0"
-          :height="chartExpanded.eco2 ? 400 : 200"
-          :yMin="350"
-          :thresholdBands="eco2ThresholdBands"
-      />
-    </section>
 
-    <!-- Temperature chart card -->
-    <section v-if="me?.ok" class="card chartTopCard">
-      <div class="chartCardHead">
-        <span class="chartCardTitle">Temperature</span>
-        <div class="chartCardControls">
-          <div class="rangeBar" role="group" aria-label="Temperature time range">
-            <button
-                v-for="r in trendRangeKeys"
-                :key="r"
-                class="rangeBtn"
-                :class="{ active: chartRanges.temp === r }"
-                @click="chartRanges.temp = r"
-            >{{ r }}</button>
-          </div>
-          <button
-              class="rangeBtn expandBtn"
-              @click="chartExpanded.temp = !chartExpanded.temp"
-              :title="chartExpanded.temp ? 'Collapse chart' : 'Expand chart'"
-              :aria-pressed="chartExpanded.temp"
-          >{{ chartExpanded.temp ? '⊟' : '⊞' }}</button>
-        </div>
-      </div>
-      <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
-      <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
-      <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
-      <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
-      <AirTrendChart
-          v-else
-          :timestamps="trends.timestamps"
-          :series="[
-            { name: 'Sensor', color: '#c62828', values: trends.temps },
-            { name: 'RTC',    color: '#2e7d32', values: trends.rtcTemps },
-          ]"
-          :range="chartRanges.temp"
-          :theme="theme"
-          unit="°C"
-          :decimals="1"
-          :height="chartExpanded.temp ? 440 : 220"
-          :yPad="5"
-          :thresholdBands="tempThresholdBands"
-          :showLegend="true"
-      />
-    </section>
+      <div class="chartSubCards">
 
-    <!-- Humidity chart card -->
-    <section v-if="me?.ok" class="card chartTopCard">
-      <div class="chartCardHead">
-        <span class="chartCardTitle">Humidity</span>
-        <div class="chartCardControls">
-          <div class="rangeBar" role="group" aria-label="Humidity time range">
+        <!-- eCO₂ -->
+        <div class="chartSubCard">
+          <div class="chartCardHead">
+            <span class="chartCardTitle">eCO₂</span>
             <button
-                v-for="r in trendRangeKeys"
-                :key="r"
-                class="rangeBtn"
-                :class="{ active: chartRanges.humidity === r }"
-                @click="chartRanges.humidity = r"
-            >{{ r }}</button>
+                class="rangeBtn expandBtn"
+                @click="chartExpanded.eco2 = !chartExpanded.eco2"
+                :title="chartExpanded.eco2 ? 'Collapse chart' : 'Expand chart'"
+                :aria-pressed="chartExpanded.eco2"
+            >{{ chartExpanded.eco2 ? '⊟' : '⊞' }}</button>
           </div>
-          <button
-              class="rangeBtn expandBtn"
-              @click="chartExpanded.humidity = !chartExpanded.humidity"
-              :title="chartExpanded.humidity ? 'Collapse chart' : 'Expand chart'"
-              :aria-pressed="chartExpanded.humidity"
-          >{{ chartExpanded.humidity ? '⊟' : '⊞' }}</button>
+          <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
+          <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
+          <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
+          <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
+          <AirTrendChart
+              v-else
+              :timestamps="trends.timestamps"
+              :series="[{ name: 'eCO₂', color: '#6a1b9a', values: trends.eco2s }]"
+              :range="universalRange"
+              :theme="theme"
+              unit="ppm"
+              :decimals="0"
+              :height="chartExpanded.eco2 ? 400 : 200"
+              :yMin="350"
+              :thresholdBands="eco2ThresholdBands"
+          />
         </div>
-      </div>
-      <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
-      <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
-      <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
-      <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
-      <AirTrendChart
-          v-else
-          :timestamps="trends.timestamps"
-          :series="[{ name: 'Humidity', color: '#1565c0', values: trends.rhs }]"
-          :range="chartRanges.humidity"
-          :theme="theme"
-          unit="%"
-          :decimals="1"
-          :height="chartExpanded.humidity ? 400 : 200"
-          :thresholdBands="humidityThresholdBands"
-      />
-    </section>
 
-    <!-- TVOC chart card -->
-    <section v-if="me?.ok" class="card chartTopCard">
-      <div class="chartCardHead">
-        <span class="chartCardTitle">TVOC</span>
-        <div class="chartCardControls">
-          <div class="rangeBar" role="group" aria-label="TVOC time range">
+        <!-- Temperature -->
+        <div class="chartSubCard">
+          <div class="chartCardHead">
+            <span class="chartCardTitle">Temperature</span>
             <button
-                v-for="r in trendRangeKeys"
-                :key="r"
-                class="rangeBtn"
-                :class="{ active: chartRanges.tvoc === r }"
-                @click="chartRanges.tvoc = r"
-            >{{ r }}</button>
+                class="rangeBtn expandBtn"
+                @click="chartExpanded.temp = !chartExpanded.temp"
+                :title="chartExpanded.temp ? 'Collapse chart' : 'Expand chart'"
+                :aria-pressed="chartExpanded.temp"
+            >{{ chartExpanded.temp ? '⊟' : '⊞' }}</button>
           </div>
-          <button
-              class="rangeBtn expandBtn"
-              @click="chartExpanded.tvoc = !chartExpanded.tvoc"
-              :title="chartExpanded.tvoc ? 'Collapse chart' : 'Expand chart'"
-              :aria-pressed="chartExpanded.tvoc"
-          >{{ chartExpanded.tvoc ? '⊟' : '⊞' }}</button>
+          <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
+          <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
+          <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
+          <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
+          <AirTrendChart
+              v-else
+              :timestamps="trends.timestamps"
+              :series="[
+                { name: 'Sensor', color: '#c62828', values: trends.temps },
+                { name: 'RTC',    color: '#2e7d32', values: trends.rtcTemps },
+              ]"
+              :range="universalRange"
+              :theme="theme"
+              unit="°C"
+              :decimals="1"
+              :height="chartExpanded.temp ? 440 : 220"
+              :yPad="5"
+              :thresholdBands="tempThresholdBands"
+              :showLegend="true"
+          />
         </div>
+
+        <!-- Humidity -->
+        <div class="chartSubCard">
+          <div class="chartCardHead">
+            <span class="chartCardTitle">Humidity</span>
+            <button
+                class="rangeBtn expandBtn"
+                @click="chartExpanded.humidity = !chartExpanded.humidity"
+                :title="chartExpanded.humidity ? 'Collapse chart' : 'Expand chart'"
+                :aria-pressed="chartExpanded.humidity"
+            >{{ chartExpanded.humidity ? '⊟' : '⊞' }}</button>
+          </div>
+          <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
+          <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
+          <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
+          <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
+          <AirTrendChart
+              v-else
+              :timestamps="trends.timestamps"
+              :series="[{ name: 'Humidity', color: '#1565c0', values: trends.rhs }]"
+              :range="universalRange"
+              :theme="theme"
+              unit="%"
+              :decimals="1"
+              :height="chartExpanded.humidity ? 400 : 200"
+              :thresholdBands="humidityThresholdBands"
+          />
+        </div>
+
+        <!-- TVOC -->
+        <div class="chartSubCard">
+          <div class="chartCardHead">
+            <span class="chartCardTitle">TVOC</span>
+            <button
+                class="rangeBtn expandBtn"
+                @click="chartExpanded.tvoc = !chartExpanded.tvoc"
+                :title="chartExpanded.tvoc ? 'Collapse chart' : 'Expand chart'"
+                :aria-pressed="chartExpanded.tvoc"
+            >{{ chartExpanded.tvoc ? '⊟' : '⊞' }}</button>
+          </div>
+          <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
+          <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
+          <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
+          <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
+          <AirTrendChart
+              v-else
+              :timestamps="trends.timestamps"
+              :series="[{ name: 'TVOC', color: '#ef6c00', values: trends.tvocs }]"
+              :range="universalRange"
+              :theme="theme"
+              unit="ppb"
+              :decimals="0"
+              :height="chartExpanded.tvoc ? 400 : 200"
+              :yMin="0"
+              :thresholdBands="tvocThresholdBands"
+          />
+        </div>
+
       </div>
-      <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view trends.</div>
-      <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
-      <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
-      <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
-      <AirTrendChart
-          v-else
-          :timestamps="trends.timestamps"
-          :series="[{ name: 'TVOC', color: '#ef6c00', values: trends.tvocs }]"
-          :range="chartRanges.tvoc"
-          :theme="theme"
-          unit="ppb"
-          :decimals="0"
-          :height="chartExpanded.tvoc ? 400 : 200"
-          :yMin="0"
-          :thresholdBands="tvocThresholdBands"
-      />
     </section>
 
     <!-- Latest packets -->
@@ -337,10 +326,77 @@
 
     <section v-if="me?.ok" class="card">
       <h2>Account</h2>
-      <div><strong>Name:</strong> {{ me.user?.full_name || me.user?.username || me.user?.first_name }}</div>
-      <div><strong>Email:</strong> {{ me.user?.email || "—" }}</div>
-      <div><strong>Buwana Sub:</strong> {{ me.user?.buwana_sub || "—" }}</div>
-      <div><strong>Buwana ID:</strong> {{ me.user?.buwana_id || "—" }}</div>
+      <div class="accountGrid">
+
+        <!-- Identity — buwana:basic -->
+        <div class="accountField" v-if="me.user?.earthling_emoji">
+          <span class="accountEmoji">{{ me.user.earthling_emoji }}</span>
+        </div>
+        <div class="accountField">
+          <span class="accountLabel">Name</span>
+          <span>{{ me.user?.full_name || [me.user?.given_name || me.user?.first_name, me.user?.family_name || me.user?.last_name].filter(Boolean).join(' ') || me.user?.username || "—" }}</span>
+        </div>
+        <div class="accountField">
+          <span class="accountLabel">Email</span>
+          <span>{{ me.user?.email || "—" }}</span>
+        </div>
+        <div class="accountField">
+          <span class="accountLabel">Buwana ID</span>
+          <span>{{ me.user?.buwana_id || "—" }}</span>
+        </div>
+        <div class="accountField" v-if="me.user?.buwana_sub">
+          <span class="accountLabel">Buwana Sub</span>
+          <span class="muted tiny">{{ me.user.buwana_sub }}</span>
+        </div>
+
+        <!-- Profile — buwana:profile -->
+        <template v-if="me.user?.country || me.user?.language || me.user?.role">
+          <div class="accountDivider"></div>
+          <div class="accountField" v-if="me.user?.country">
+            <span class="accountLabel">Country</span>
+            <span>{{ me.user.country }}</span>
+          </div>
+          <div class="accountField" v-if="me.user?.language">
+            <span class="accountLabel">Language</span>
+            <span>{{ me.user.language }}</span>
+          </div>
+          <div class="accountField" v-if="me.user?.role">
+            <span class="accountLabel">Role</span>
+            <span>{{ me.user.role }}</span>
+          </div>
+        </template>
+
+        <!-- Community — buwana:community -->
+        <template v-if="me.user?.community">
+          <div class="accountDivider"></div>
+          <div class="accountField">
+            <span class="accountLabel">Community</span>
+            <span>{{ me.user.community }}</span>
+          </div>
+        </template>
+
+        <!-- Bioregion — buwana:bioregion -->
+        <template v-if="me.user?.continent || me.user?.location_full || me.user?.watershed_name">
+          <div class="accountDivider"></div>
+          <div class="accountField" v-if="me.user?.continent">
+            <span class="accountLabel">Continent</span>
+            <span>{{ me.user.continent }}</span>
+          </div>
+          <div class="accountField" v-if="me.user?.location_full">
+            <span class="accountLabel">Location</span>
+            <span>{{ me.user.location_full }}</span>
+          </div>
+          <div class="accountField" v-if="me.user?.watershed_name">
+            <span class="accountLabel">Watershed</span>
+            <span>{{ me.user.watershed_name }}<span v-if="me.user?.location_watershed" class="muted"> · {{ me.user.location_watershed }}</span></span>
+          </div>
+          <div class="accountField" v-if="me.user?.location_lat && me.user?.location_long">
+            <span class="accountLabel">Coordinates</span>
+            <span class="tiny muted">{{ me.user.location_lat }}, {{ me.user.location_long }}</span>
+          </div>
+        </template>
+
+      </div>
     </section>
 
     <section v-if="me?.ok" class="card">
@@ -389,9 +445,9 @@
         <div class="sessionField" v-if="me.user?.earthling_emoji">
           <span class="sessionEmoji">{{ me.user.earthling_emoji }}</span>
         </div>
-        <div class="sessionField" v-if="me.user?.first_name">
+        <div class="sessionField" v-if="me.user?.given_name || me.user?.first_name">
           <span class="sessionLabel">First name</span>
-          <span>{{ me.user.first_name }}</span>
+          <span>{{ me.user.given_name || me.user.first_name }}</span>
         </div>
         <div class="sessionField" v-if="me.user?.buwana_id">
           <span class="sessionLabel">Buwana ID</span>
@@ -786,14 +842,9 @@ const selectedDeviceLabel = computed(() =>
 )
 
 // ── Chart ranges & threshold bands ──────────────────────────────────────────
-const trendRangeKeys = ["15m", "30m", "1h", "3h", "6h", "12h", "24h"]
+const trendRangeKeys = ["15m", "30m", "1h", "3h", "6h", "12h", "24h", "36h", "72h", "7d", "30d"]
 
-const chartRanges = reactive({
-  eco2: "1h",
-  temp: "1h",
-  humidity: "1h",
-  tvoc: "1h",
-})
+const universalRange = ref("1h")
 
 const chartExpanded = reactive({
   eco2: false,
@@ -847,6 +898,11 @@ const {
   immediate: true,
 })
 
+const RANGE_FETCH_HOURS = {
+  '15m': 1, '30m': 1, '1h': 2, '3h': 4, '6h': 7, '12h': 13, '24h': 25,
+  '36h': 37, '72h': 73, '7d': 169, '30d': 721,
+}
+
 const {
   data: trends,
   pending: trendsPending,
@@ -854,8 +910,11 @@ const {
 } = await useFetch("/api/dashboard/device-trends", {
   credentials: "include",
   headers: { "Cache-Control": "no-cache" },
-  query: computed(() => ({ device_uid: selectedDeviceUid.value || undefined, hours: 24 })),
-  watch: [selectedDeviceUid],
+  query: computed(() => ({
+    device_uid: selectedDeviceUid.value || undefined,
+    hours: RANGE_FETCH_HOURS[universalRange.value] ?? 25,
+  })),
+  watch: [selectedDeviceUid, universalRange],
   immediate: true,
 })
 
@@ -1174,6 +1233,12 @@ function pretty(v) {
   margin-bottom: 18px;
 }
 
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .btns {
   display: flex;
   gap: 10px;
@@ -1227,11 +1292,65 @@ function pretty(v) {
   border-color: rgba(180, 35, 24, 0.35);
 }
 
+.btnGithub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.githubIcon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
 .iconBtn {
   min-width: 40px;
   padding: 8px 10px;
   font-size: 18px;
   line-height: 1;
+}
+
+.abIconLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 4px;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.abIconLink:hover {
+  opacity: 0.75;
+}
+
+.abIcon {
+  width: 36px;
+  height: 36px;
+  display: block;
+}
+
+.abIconMobile {
+  display: block;
+}
+
+.abLogoDesktop {
+  display: none;
+}
+
+.abLogo {
+  height: 36px;
+  width: auto;
+}
+
+@media (min-width: 641px) {
+  .abIconMobile {
+    display: none;
+  }
+  .abLogoDesktop {
+    display: block;
+  }
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────────── */
@@ -1290,9 +1409,40 @@ pre {
   font: inherit;
 }
 
-/* ── Chart cards ────────────────────────────────────────────────────────────── */
-.chartTopCard {
+/* ── Charts panel ────────────────────────────────────────────────────────────── */
+.chartsPanel {
   padding: 16px 16px 12px;
+}
+
+.chartsPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.chartsPanelTitle {
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.88;
+}
+
+.chartSubCards {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chartSubCard {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.chartSubCard:first-child {
+  border-top: none;
+  padding-top: 0;
 }
 
 .chartCardHead {
@@ -1300,15 +1450,7 @@ pre {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.chartCardControls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 
 .expandBtn {
@@ -1455,6 +1597,38 @@ pre {
   cursor: pointer;
   user-select: none;
   padding: 4px 0;
+}
+
+/* ── Account panel ──────────────────────────────────────────────────────────── */
+.accountGrid {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.accountField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.accountEmoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.accountLabel {
+  font-weight: 600;
+  min-width: 100px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.accountDivider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 0;
 }
 
 /* ── Device + home grids ────────────────────────────────────────────────────── */
@@ -1639,7 +1813,10 @@ pre {
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .header,
+  .header {
+    flex-wrap: wrap;
+  }
+
   .sectionHeader,
   .modalHeader {
     flex-direction: column;
@@ -1658,8 +1835,13 @@ pre {
     justify-content: flex-start;
   }
 
-  .chartTopCard {
+  .chartsPanel {
     padding: 12px 12px 8px;
+  }
+
+  .chartsPanelHead {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
