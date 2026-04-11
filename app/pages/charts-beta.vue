@@ -109,10 +109,10 @@
       </div>
     </section>
 
-    <!-- eCO₂ chart card — migrated to AirTrendChart (ECharts) -->
+    <!-- CO₂ chart card -->
     <section class="card chartTopCard">
       <div class="chartCardHead">
-        <span class="chartCardTitle">eCO₂</span>
+        <span class="chartCardTitle">CO₂</span>
         <div class="chartCardControls">
           <div class="rangeBar" role="group" aria-label="eCO₂ time range">
             <button
@@ -138,7 +138,7 @@
       <AirTrendChart
           v-else
           :timestamps="trends.timestamps"
-          :series="[{ name: 'eCO₂', color: '#6a1b9a', values: trends.eco2s }]"
+          :series="co2Series"
           :range="chartRanges.eco2"
           :theme="theme"
           unit="ppm"
@@ -146,6 +146,7 @@
           :height="chartExpanded.eco2 ? 400 : 200"
           :yMin="350"
           :thresholdBands="eco2ThresholdBands"
+          :showLegend="co2Series.length > 1"
       />
     </section>
 
@@ -178,10 +179,7 @@
       <AirTrendChart
           v-else
           :timestamps="trends.timestamps"
-          :series="[
-            { name: 'Sensor', color: '#c62828', values: trends.temps },
-            { name: 'RTC',    color: '#2e7d32', values: trends.rtcTemps },
-          ]"
+          :series="tempSeries"
           :range="chartRanges.temp"
           :theme="theme"
           unit="°C"
@@ -189,7 +187,7 @@
           :height="chartExpanded.temp ? 440 : 220"
           :yPad="5"
           :thresholdBands="tempThresholdBands"
-          :showLegend="true"
+          :showLegend="tempSeries.length > 1"
       />
     </section>
 
@@ -222,13 +220,14 @@
       <AirTrendChart
           v-else
           :timestamps="trends.timestamps"
-          :series="[{ name: 'Humidity', color: '#1565c0', values: trends.rhs }]"
+          :series="humiditySeries"
           :range="chartRanges.humidity"
           :theme="theme"
           unit="%"
           :decimals="1"
           :height="chartExpanded.humidity ? 400 : 200"
           :thresholdBands="humidityThresholdBands"
+          :showLegend="humiditySeries.length > 1"
       />
     </section>
 
@@ -261,7 +260,7 @@
       <AirTrendChart
           v-else
           :timestamps="trends.timestamps"
-          :series="[{ name: 'TVOC', color: '#ef6c00', values: trends.tvocs }]"
+          :series="[{ name: 'TVOC', color: '#ef6c00', values: trends.ensTvocs }]"
           :range="chartRanges.tvoc"
           :theme="theme"
           unit="ppb"
@@ -288,21 +287,27 @@
           <thead>
           <tr>
             <th>Time</th>
-            <th>eCO₂</th>
-            <th>Temp</th>
-            <th>RH</th>
+            <th>ENS CO₂</th>
+            <th>SCD CO₂</th>
+            <th>AHT Temp</th>
+            <th>SCD Temp</th>
+            <th>RTC Temp</th>
+            <th>AHT RH</th>
+            <th>SCD RH</th>
             <th>TVOC</th>
-            <th>RTC</th>
           </tr>
           </thead>
           <tbody>
           <tr v-for="pkt in latestPackets" :key="pkt.ts">
             <td>{{ pkt.timeLabel }}</td>
-            <td>{{ pkt.eco2 }}</td>
-            <td>{{ pkt.temp }}</td>
-            <td>{{ pkt.rh }}</td>
-            <td>{{ pkt.tvoc }}</td>
+            <td>{{ pkt.ensEco2 }}</td>
+            <td>{{ pkt.scdCo2 }}</td>
+            <td>{{ pkt.ahtTemp }}</td>
+            <td>{{ pkt.scdTemp }}</td>
             <td>{{ pkt.rtcTemp }}</td>
+            <td>{{ pkt.ahtHumidity }}</td>
+            <td>{{ pkt.scdHumidity }}</td>
+            <td>{{ pkt.tvoc }}</td>
           </tr>
           </tbody>
         </table>
@@ -326,10 +331,10 @@
 
       <template v-else>
         <div class="grid">
-          <MetricCard label="CO₂" :value="formatMetric(live?.eco2_ppm, 0)" unit="ppm" />
-          <MetricCard label="Temperature" :value="formatMetric(live?.temp_c, 1)" unit="°C" />
-          <MetricCard label="Humidity" :value="formatMetric(live?.rh_pct, 1)" unit="%" />
-          <MetricCard label="AQI" :value="formatMetric(live?.aqi, 0)" />
+          <MetricCard label="CO₂" :value="formatMetric(live?.ens_eco2 ?? live?.scd_co2, 0)" unit="ppm" />
+          <MetricCard label="Temperature" :value="formatMetric(live?.aht_temp ?? live?.scd_temp, 1)" unit="°C" />
+          <MetricCard label="Humidity" :value="formatMetric(live?.aht_humidity ?? live?.scd_humidity, 1)" unit="%" />
+          <MetricCard label="AQI" :value="formatMetric(live?.ens_aqi, 0)" />
         </div>
 
         <div class="meta tiny muted">
@@ -636,22 +641,58 @@ function formatPacketValue(value, decimals = 0, unit = "") {
   return `${n.toFixed(decimals)}${unit ? ` ${unit}` : ""}`
 }
 
+// ── Multi-sensor chart series ────────────────────────────────────────────────
+function hasData(arr) {
+  return Array.isArray(arr) && arr.some(v => v !== null && Number.isFinite(Number(v)))
+}
+
+const co2Series = computed(() => {
+  const series = []
+  const t = trends.value
+  if (hasData(t?.ensEco2s))  series.push({ name: 'ENS eCO₂', color: '#6a1b9a', values: t.ensEco2s })
+  if (hasData(t?.scdCo2s))   series.push({ name: 'SCD CO₂',  color: '#00796b', values: t.scdCo2s })
+  return series
+})
+
+const tempSeries = computed(() => {
+  const series = []
+  const t = trends.value
+  if (hasData(t?.ahtTemps))  series.push({ name: 'AHT Temp', color: '#c62828', values: t.ahtTemps })
+  if (hasData(t?.scdTemps))  series.push({ name: 'SCD Temp', color: '#1565c0', values: t.scdTemps })
+  if (hasData(t?.rtcTemps))  series.push({ name: 'RTC Temp', color: '#2e7d32', values: t.rtcTemps })
+  return series
+})
+
+const humiditySeries = computed(() => {
+  const series = []
+  const t = trends.value
+  if (hasData(t?.ahtHumidities)) series.push({ name: 'AHT RH', color: '#1565c0', values: t.ahtHumidities })
+  if (hasData(t?.scdHumidities)) series.push({ name: 'SCD RH', color: '#00838f', values: t.scdHumidities })
+  return series
+})
+
 const latestPackets = computed(() => {
-  const ts = Array.isArray(trends.value?.timestamps) ? trends.value.timestamps : []
-  const eco2s = Array.isArray(trends.value?.eco2s) ? trends.value.eco2s : []
-  const temps = Array.isArray(trends.value?.temps) ? trends.value.temps : []
-  const rhs = Array.isArray(trends.value?.rhs) ? trends.value.rhs : []
-  const tvocs = Array.isArray(trends.value?.tvocs) ? trends.value.tvocs : []
-  const rtcTemps = Array.isArray(trends.value?.rtcTemps) ? trends.value.rtcTemps : []
+  const ts              = Array.isArray(trends.value?.timestamps)    ? trends.value.timestamps    : []
+  const ensEco2s        = Array.isArray(trends.value?.ensEco2s)      ? trends.value.ensEco2s      : []
+  const scdCo2s         = Array.isArray(trends.value?.scdCo2s)       ? trends.value.scdCo2s       : []
+  const ahtTemps        = Array.isArray(trends.value?.ahtTemps)      ? trends.value.ahtTemps      : []
+  const scdTemps        = Array.isArray(trends.value?.scdTemps)      ? trends.value.scdTemps      : []
+  const rtcTemps        = Array.isArray(trends.value?.rtcTemps)      ? trends.value.rtcTemps      : []
+  const ahtHumidities   = Array.isArray(trends.value?.ahtHumidities) ? trends.value.ahtHumidities : []
+  const scdHumidities   = Array.isArray(trends.value?.scdHumidities) ? trends.value.scdHumidities : []
+  const ensTvocs        = Array.isArray(trends.value?.ensTvocs)      ? trends.value.ensTvocs      : []
 
   const rows = ts.map((t, i) => ({
-    ts: Number(t) || i,
-    timeLabel: formatPacketTime(t),
-    eco2: formatPacketValue(eco2s[i], 0, "ppm"),
-    temp: formatPacketValue(temps[i], 1, "°C"),
-    rh: formatPacketValue(rhs[i], 1, "%"),
-    tvoc: formatPacketValue(tvocs[i], 0, "ppb"),
-    rtcTemp: formatPacketValue(rtcTemps[i], 1, "°C"),
+    ts:          Number(t) || i,
+    timeLabel:   formatPacketTime(t),
+    ensEco2:     formatPacketValue(ensEco2s[i],       0, "ppm"),
+    scdCo2:      formatPacketValue(scdCo2s[i],        0, "ppm"),
+    ahtTemp:     formatPacketValue(ahtTemps[i],       1, "°C"),
+    scdTemp:     formatPacketValue(scdTemps[i],       1, "°C"),
+    rtcTemp:     formatPacketValue(rtcTemps[i],       1, "°C"),
+    ahtHumidity: formatPacketValue(ahtHumidities[i],  1, "%"),
+    scdHumidity: formatPacketValue(scdHumidities[i],  1, "%"),
+    tvoc:        formatPacketValue(ensTvocs[i],        0, "ppb"),
   }))
 
   return rows

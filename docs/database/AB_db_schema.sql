@@ -209,6 +209,7 @@ CREATE TABLE `users_tb` (
                             `email` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
                             `account_status` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
                             `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            `buwana_account_created_at` datetime DEFAULT NULL COMMENT 'created_at claim from buwana:profile ? Buwana account creation date',
                             `role` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
                             `gea_status` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'null',
                             `terms_of_service` tinyint(1) NOT NULL DEFAULT '0',
@@ -217,19 +218,26 @@ CREATE TABLE `users_tb` (
                             `suspended` tinyint(1) NOT NULL DEFAULT '0',
                             `profile_pic` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'null',
                             `country_id` int DEFAULT NULL,
+                            `country_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'country claim from buwana:profile ? resolved country name',
                             `language_id` varchar(11) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en',
+                            `language_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'language claim from buwana:profile ? resolved language name in English',
                             `community_id` int DEFAULT NULL,
+                            `community_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'buwana:community claim ? full name of the user''s primary community',
                             `watershed_id` int DEFAULT NULL,
+                            `watershed_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'watershed_name claim from buwana:bioregion ? watershed name in English',
                             `continent_code` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+                            `continent_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'continent claim from buwana:bioregion ? resolved continent name in English',
                             `location_full` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
                             `location_watershed` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-                            `location_lat` decimal(10,8) DEFAULT NULL,
-                            `location_long` decimal(11,8) DEFAULT NULL,
+                            `location_lat` decimal(10, 8) DEFAULT NULL,
+                            `location_long` decimal(11, 8) DEFAULT NULL,
                             `earthen_newsletter_join` tinyint(1) DEFAULT '1',
                             `birth_date` date DEFAULT NULL,
                             `deleteable` tinyint(1) NOT NULL DEFAULT '1',
                             `earthling_emoji` varchar(4) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
                             `time_zone` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Etc/GMT',
+                            `brikcoin_balance` decimal(15, 4) DEFAULT NULL COMMENT 'brikcoin_balance claim from buwana:profile',
+                            `connected_app_ids` text COLLATE utf8mb4_unicode_ci COMMENT 'connected_app_ids claim from buwana:profile ? JSON array of connected Buwana app IDs',
                             PRIMARY KEY (`user_id`),
                             UNIQUE KEY `uniq_users_buwana_sub` (`buwana_sub`),
                             UNIQUE KEY `uniq_users_email` (`email`),
@@ -239,7 +247,7 @@ CREATE TABLE `users_tb` (
                             KEY `idx_users_language` (`language_id`),
                             KEY `idx_users_watershed` (`watershed_id`),
                             KEY `idx_users_community` (`community_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE = InnoDB AUTO_INCREMENT = 63 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
