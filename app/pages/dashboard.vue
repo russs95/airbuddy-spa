@@ -28,7 +28,7 @@
           </svg>
           Build
         </a>
-        <a v-if="!me?.ok" class="btn" href="/api/auth/login">Login</a>
+        <button v-if="!me?.ok" class="btn" @click="doLogin">Login</button>
         <button class="btn danger" @click="logout" :disabled="logoutPending">
           {{ logoutPending ? "Logging out..." : "Logout" }}
         </button>
@@ -66,7 +66,7 @@
             v-for="device in devices"
             :key="device.device_id"
             class="deviceCard"
-            :class="{ selected: selectedDeviceUid === device.device_uid }"
+            :class="{ selected: selectedDeviceUid === device.device_uid, compare: compareDeviceUid === device.device_uid }"
             role="button"
             tabindex="0"
             @click="selectDevice(device)"
@@ -90,6 +90,13 @@
           <div class="muted tiny">
             Status: {{ device.status || "—" }}
           </div>
+          <button
+              v-if="selectedDeviceUid && selectedDeviceUid !== device.device_uid"
+              class="compareBtn"
+              :class="{ compareActive: compareDeviceUid === device.device_uid }"
+              type="button"
+              @click.stop="selectCompareDevice(device)"
+          >{{ compareDeviceUid === device.device_uid ? 'Comparing ✕' : 'Compare' }}</button>
         </div>
       </div>
     </section>
@@ -128,7 +135,7 @@
           <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
           <AirTrendChart
               v-else
-              :timestamps="trends.timestamps"
+              :timestamps="mergedTimestamps"
               :series="co2Series"
               :range="universalRange"
               :theme="theme"
@@ -158,7 +165,7 @@
           <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
           <AirTrendChart
               v-else
-              :timestamps="trends.timestamps"
+              :timestamps="mergedTimestamps"
               :series="tempSeries"
               :range="universalRange"
               :theme="theme"
@@ -188,7 +195,7 @@
           <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
           <AirTrendChart
               v-else
-              :timestamps="trends.timestamps"
+              :timestamps="mergedTimestamps"
               :series="humiditySeries"
               :range="universalRange"
               :theme="theme"
@@ -217,8 +224,8 @@
           <div v-else-if="!trends?.timestamps?.length" class="muted chartEmpty">No trend data yet for this device.</div>
           <AirTrendChart
               v-else
-              :timestamps="trends.timestamps"
-              :series="[{ name: 'TVOC', color: '#ef6c00', values: trends.ensTvocs }]"
+              :timestamps="mergedTimestamps"
+              :series="tvocSeries"
               :range="universalRange"
               :theme="theme"
               unit="ppb"
@@ -226,9 +233,122 @@
               :height="chartExpanded.tvoc ? 400 : 200"
               :yMin="0"
               :thresholdBands="tvocThresholdBands"
+              :showLegend="tvocSeries.length > 1"
           />
         </div>
 
+      </div>
+    </section>
+
+    <!-- Battery panel -->
+    <section v-if="me?.ok" class="card chartsPanel">
+      <div class="chartsPanelHead">
+        <span class="chartsPanelTitle">Battery</span>
+        <div class="rangeBar" role="group" aria-label="Time range">
+          <button
+              v-for="r in trendRangeKeys"
+              :key="r"
+              class="rangeBtn"
+              :class="{ active: universalRange === r }"
+              @click="universalRange = r"
+          >{{ r }}</button>
+        </div>
+      </div>
+
+      <div class="chartSubCards">
+
+        <!-- Charge level -->
+        <div class="chartSubCard">
+          <div class="chartCardHead">
+            <span class="chartCardTitle">Charge Level</span>
+            <button
+                class="rangeBtn expandBtn"
+                @click="chartExpanded.battery = !chartExpanded.battery"
+                :title="chartExpanded.battery ? 'Collapse chart' : 'Expand chart'"
+                :aria-pressed="chartExpanded.battery"
+            >{{ chartExpanded.battery ? '⊟' : '⊞' }}</button>
+          </div>
+          <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view battery.</div>
+          <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
+          <div v-else-if="trendsError" class="error chartEmpty">Trends failed: {{ trendsErrorMessage }}</div>
+          <div v-else-if="!battLevelSeries.length" class="muted chartEmpty">No battery data yet for this device.</div>
+          <AirTrendChart
+              v-else
+              :timestamps="mergedTimestamps"
+              :series="battLevelSeries"
+              :range="universalRange"
+              :theme="theme"
+              unit="%"
+              :decimals="0"
+              :height="chartExpanded.battery ? 400 : 200"
+              :yMin="0"
+              :yMax="100"
+              :thresholdBands="battThresholdBands"
+              :showLegend="true"
+          />
+        </div>
+
+        <!-- Current -->
+        <div class="chartSubCard">
+          <div class="chartCardHead">
+            <span class="chartCardTitle">Current (+ charging / − discharging)</span>
+          </div>
+          <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view battery.</div>
+          <div v-else-if="trendsPending" class="muted chartEmpty">Loading…</div>
+          <div v-else-if="!battCurrentSeries.length" class="muted chartEmpty">No current data yet for this device.</div>
+          <AirTrendChart
+              v-else
+              :timestamps="mergedTimestamps"
+              :series="battCurrentSeries"
+              :range="universalRange"
+              :theme="theme"
+              unit="mA"
+              :decimals="0"
+              :height="chartExpanded.battery ? 400 : 200"
+              :yPad="50"
+              :showLegend="battCurrentSeries.length > 1"
+          />
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Current Location -->
+    <section v-if="me?.ok" class="card chartsPanel">
+      <div class="chartCardHead">
+        <span class="chartsPanelTitle">Current Location</span>
+        <button
+            class="rangeBtn expandBtn"
+            @click="mapExpanded = !mapExpanded"
+            :title="mapExpanded ? 'Collapse map' : 'Expand map'"
+            :aria-pressed="mapExpanded"
+        >{{ mapExpanded ? '⊟' : '⊞' }}</button>
+      </div>
+
+      <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view location.</div>
+      <div v-else-if="livePending" class="muted chartEmpty">Loading…</div>
+      <div v-else>
+        <LocationMap
+            :lat="live?.lat ?? null"
+            :lon="live?.lon ?? null"
+            :height="mapExpanded ? 420 : 180"
+            :theme="theme"
+        />
+
+        <div class="locationMeta tiny muted">
+          <template v-if="live?.lat != null && live?.lon != null">
+            <span class="locationCoord">
+              <strong>Lat:</strong> {{ Number(live.lat).toFixed(6) }}°
+            </span>
+            <span class="locationCoord">
+              <strong>Lon:</strong> {{ Number(live.lon).toFixed(6) }}°
+            </span>
+            <span v-if="live?.recorded_at">
+              <strong>As of:</strong> {{ live.recorded_at }}
+            </span>
+          </template>
+          <span v-else class="muted">No GPS coordinates in last packet.</span>
+        </div>
       </div>
     </section>
 
@@ -297,6 +417,8 @@
           <MetricCard label="Temperature" :value="formatMetric(live?.aht_temp ?? live?.scd_temp, 1)" unit="°C" />
           <MetricCard label="Humidity" :value="formatMetric(live?.aht_humidity ?? live?.scd_humidity, 1)" unit="%" />
           <MetricCard label="AQI" :value="formatMetric(live?.ens_aqi, 0)" />
+          <MetricCard v-if="live?.ina_batt_pct != null" label="Battery" :value="formatMetric(live?.ina_batt_pct, 0)" unit="%" />
+          <MetricCard v-if="live?.ina_bus_v != null" label="Bus V" :value="formatMetric(live?.ina_bus_v, 2)" unit="V" />
         </div>
 
         <div class="meta tiny muted">
@@ -701,6 +823,8 @@
 
 <script setup>
 import AirTrendChart from '~/components/charts/AirTrendChart.vue'
+import LocationMap from '~/components/LocationMap.vue'
+import { mergeTimestamps, alignSeries } from '~/lib/mergeTimestamps'
 
 useHead({ title: 'AirBuddy | Beta Dashboard' })
 
@@ -733,6 +857,10 @@ watch(theme, (v) => {
 
 function toggleTheme() {
   theme.value = theme.value === "dark" ? "light" : "dark"
+}
+
+function doLogin() {
+  window.location.href = `/api/auth/login?mode=${encodeURIComponent(theme.value)}`
 }
 
 // ── Auth / session ───────────────────────────────────────────────────────────
@@ -789,6 +917,21 @@ const devicesErrorMessage = computed(() => {
 
 // ── Device selector for charts ───────────────────────────────────────────────
 const selectedDeviceUid = ref("")
+const compareDeviceUid = ref("")
+
+const DEVICE1_COLORS = {
+  ensEco2: '#6a1b9a', scdCo2: '#00796b',
+  ahtTemp: '#c62828', scdTemp: '#1565c0', rtcTemp: '#2e7d32',
+  ahtHumidity: '#1565c0', scdHumidity: '#00838f', tvoc: '#ef6c00',
+  battPct: '#f59e0b', battBusV: '#fbbf24', battCurrent: '#3b82f6',
+}
+
+const DEVICE2_COLORS = {
+  ensEco2: '#ce93d8', scdCo2: '#80cbc4',
+  ahtTemp: '#ef9a9a', scdTemp: '#90caf9', rtcTemp: '#a5d6a7',
+  ahtHumidity: '#90caf9', scdHumidity: '#80deea', tvoc: '#ffcc80',
+  battPct: '#fcd34d', battBusV: '#fde68a', battCurrent: '#93c5fd',
+}
 
 const deviceOptions = computed(() => {
   const out = []
@@ -814,9 +957,20 @@ const deviceOptions = computed(() => {
 watch(
     deviceOptions,
     (list) => {
-      if (!list.length) { selectedDeviceUid.value = ""; return }
+      if (!list.length) { selectedDeviceUid.value = ""; compareDeviceUid.value = ""; return }
       if (!selectedDeviceUid.value || !list.some(d => d.device_uid === selectedDeviceUid.value)) {
-        selectedDeviceUid.value = list[0].device_uid
+        const saved = process.client ? localStorage.getItem("airbuddy-selected-device") : null
+        if (saved && list.some(d => d.device_uid === saved)) {
+          selectedDeviceUid.value = saved
+        } else {
+          selectedDeviceUid.value = list[0].device_uid
+        }
+      }
+      if (process.client) {
+        const savedCompare = localStorage.getItem("airbuddy-compare-device")
+        if (savedCompare && savedCompare !== selectedDeviceUid.value && list.some(d => d.device_uid === savedCompare)) {
+          compareDeviceUid.value = savedCompare
+        }
       }
     },
     { immediate: true }
@@ -836,7 +990,10 @@ const chartExpanded = reactive({
   temp: false,
   humidity: false,
   tvoc: false,
+  battery: false,
 })
+
+const mapExpanded = ref(false)
 
 const eco2ThresholdBands = [
   { label: 'Good',      from: 0,    to: 800,      color: 'rgba(34,197,94,0.10)'  },
@@ -868,6 +1025,13 @@ const tvocThresholdBands = [
   { label: 'Moderate', from: 660,  to: 2200,     color: 'rgba(249,115,22,0.13)'  },
   { label: 'High',     from: 2200, to: 5500,     color: 'rgba(239,68,68,0.14)'   },
   { label: 'Danger',   from: 5500, to: Infinity, color: 'rgba(127,0,0,0.18)'     },
+]
+
+const battThresholdBands = [
+  { label: 'Critical', from: 0,  to: 20,  color: 'rgba(239,68,68,0.14)'   },
+  { label: 'Low',      from: 20, to: 40,  color: 'rgba(249,115,22,0.12)'  },
+  { label: 'Good',     from: 40, to: 80,  color: 'rgba(234,179,8,0.10)'   },
+  { label: 'Full',     from: 80, to: 100, color: 'rgba(34,197,94,0.09)'   },
 ]
 
 // ── Live telemetry & trends ──────────────────────────────────────────────────
@@ -903,6 +1067,17 @@ const {
   immediate: true,
 })
 
+const { data: compareTrends } = await useFetch("/api/dashboard/device-trends", {
+  credentials: "include",
+  headers: { "Cache-Control": "no-cache" },
+  query: computed(() => ({
+    device_uid: compareDeviceUid.value || undefined,
+    hours: RANGE_FETCH_HOURS[universalRange.value] ?? 25,
+  })),
+  watch: [compareDeviceUid, universalRange],
+  immediate: true,
+})
+
 const liveErrorMessage = computed(() => {
   const e = liveError.value
   return e?.data?.message || e?.message || String(e || "")
@@ -911,6 +1086,20 @@ const liveErrorMessage = computed(() => {
 const trendsErrorMessage = computed(() => {
   const e = trendsError.value
   return e?.data?.message || e?.message || String(e || "")
+})
+
+const primaryDeviceName = computed(() =>
+  devices.value.find(d => d.device_uid === selectedDeviceUid.value)?.device_name ?? 'Device 1'
+)
+
+const compareDeviceName = computed(() =>
+  devices.value.find(d => d.device_uid === compareDeviceUid.value)?.device_name ?? 'Device 2'
+)
+
+const mergedTimestamps = computed(() => {
+  const primary = trends.value?.timestamps ?? []
+  if (!compareDeviceUid.value || !compareTrends.value?.timestamps?.length) return primary
+  return mergeTimestamps(primary, compareTrends.value.timestamps)
 })
 
 // ── Telemetry helpers ────────────────────────────────────────────────────────
@@ -947,25 +1136,104 @@ function hasData(arr) {
 const co2Series = computed(() => {
   const series = []
   const t = trends.value
-  if (hasData(t?.ensEco2s))  series.push({ name: 'ENS eCO₂', color: '#6a1b9a', values: t.ensEco2s })
-  if (hasData(t?.scdCo2s))   series.push({ name: 'SCD CO₂',  color: '#00796b', values: t.scdCo2s })
+  const mt = mergedTimestamps.value
+  const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
+  const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
+  if (hasData(t?.ensEco2s)) series.push({ name: n1 + 'ENS eCO₂', color: DEVICE1_COLORS.ensEco2, values: alignSeries(mt, t.timestamps, t.ensEco2s) })
+  if (hasData(t?.scdCo2s))  series.push({ name: n1 + 'SCD CO₂',  color: DEVICE1_COLORS.scdCo2,  values: alignSeries(mt, t.timestamps, t.scdCo2s) })
+  if (hasCompare) {
+    const c = compareTrends.value
+    const n2 = compareDeviceName.value + ' '
+    if (hasData(c?.ensEco2s)) series.push({ name: n2 + 'ENS eCO₂', color: DEVICE2_COLORS.ensEco2, values: alignSeries(mt, c.timestamps, c.ensEco2s) })
+    if (hasData(c?.scdCo2s))  series.push({ name: n2 + 'SCD CO₂',  color: DEVICE2_COLORS.scdCo2,  values: alignSeries(mt, c.timestamps, c.scdCo2s) })
+  }
   return series
 })
 
 const tempSeries = computed(() => {
   const series = []
   const t = trends.value
-  if (hasData(t?.ahtTemps))  series.push({ name: 'AHT Temp', color: '#c62828', values: t.ahtTemps })
-  if (hasData(t?.scdTemps))  series.push({ name: 'SCD Temp', color: '#1565c0', values: t.scdTemps })
-  if (hasData(t?.rtcTemps))  series.push({ name: 'RTC Temp', color: '#2e7d32', values: t.rtcTemps })
+  const mt = mergedTimestamps.value
+  const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
+  const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
+  if (hasData(t?.ahtTemps)) series.push({ name: n1 + 'AHT Temp', color: DEVICE1_COLORS.ahtTemp, values: alignSeries(mt, t.timestamps, t.ahtTemps) })
+  if (hasData(t?.scdTemps)) series.push({ name: n1 + 'SCD Temp', color: DEVICE1_COLORS.scdTemp, values: alignSeries(mt, t.timestamps, t.scdTemps) })
+  if (hasData(t?.rtcTemps)) series.push({ name: n1 + 'RTC Temp', color: DEVICE1_COLORS.rtcTemp, values: alignSeries(mt, t.timestamps, t.rtcTemps) })
+  if (hasCompare) {
+    const c = compareTrends.value
+    const n2 = compareDeviceName.value + ' '
+    if (hasData(c?.ahtTemps)) series.push({ name: n2 + 'AHT Temp', color: DEVICE2_COLORS.ahtTemp, values: alignSeries(mt, c.timestamps, c.ahtTemps) })
+    if (hasData(c?.scdTemps)) series.push({ name: n2 + 'SCD Temp', color: DEVICE2_COLORS.scdTemp, values: alignSeries(mt, c.timestamps, c.scdTemps) })
+    if (hasData(c?.rtcTemps)) series.push({ name: n2 + 'RTC Temp', color: DEVICE2_COLORS.rtcTemp, values: alignSeries(mt, c.timestamps, c.rtcTemps) })
+  }
   return series
 })
 
 const humiditySeries = computed(() => {
   const series = []
   const t = trends.value
-  if (hasData(t?.ahtHumidities)) series.push({ name: 'AHT RH', color: '#1565c0', values: t.ahtHumidities })
-  if (hasData(t?.scdHumidities)) series.push({ name: 'SCD RH', color: '#00838f', values: t.scdHumidities })
+  const mt = mergedTimestamps.value
+  const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
+  const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
+  if (hasData(t?.ahtHumidities)) series.push({ name: n1 + 'AHT RH', color: DEVICE1_COLORS.ahtHumidity, values: alignSeries(mt, t.timestamps, t.ahtHumidities) })
+  if (hasData(t?.scdHumidities)) series.push({ name: n1 + 'SCD RH', color: DEVICE1_COLORS.scdHumidity, values: alignSeries(mt, t.timestamps, t.scdHumidities) })
+  if (hasCompare) {
+    const c = compareTrends.value
+    const n2 = compareDeviceName.value + ' '
+    if (hasData(c?.ahtHumidities)) series.push({ name: n2 + 'AHT RH', color: DEVICE2_COLORS.ahtHumidity, values: alignSeries(mt, c.timestamps, c.ahtHumidities) })
+    if (hasData(c?.scdHumidities)) series.push({ name: n2 + 'SCD RH', color: DEVICE2_COLORS.scdHumidity, values: alignSeries(mt, c.timestamps, c.scdHumidities) })
+  }
+  return series
+})
+
+const tvocSeries = computed(() => {
+  const series = []
+  const t = trends.value
+  const mt = mergedTimestamps.value
+  const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
+  const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
+  if (hasData(t?.ensTvocs)) series.push({ name: n1 + 'TVOC', color: DEVICE1_COLORS.tvoc, values: alignSeries(mt, t.timestamps, t.ensTvocs) })
+  if (hasCompare) {
+    const c = compareTrends.value
+    if (hasData(c?.ensTvocs)) series.push({ name: compareDeviceName.value + ' TVOC', color: DEVICE2_COLORS.tvoc, values: alignSeries(mt, c.timestamps, c.ensTvocs) })
+  }
+  return series
+})
+
+const battLevelSeries = computed(() => {
+  const series = []
+  const t = trends.value
+  const mt = mergedTimestamps.value
+  const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
+  const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
+  if (hasData(t?.inaBattPcts)) series.push({ name: n1 + 'Battery %',    color: DEVICE1_COLORS.battPct,  values: alignSeries(mt, t.timestamps, t.inaBattPcts) })
+  if (hasData(t?.inaBusVs)) {
+    const scaled = t.inaBusVs.map(v => v == null ? null : +Math.max(0, Math.min(100, (v - 3.30) / (4.20 - 3.30) * 100)).toFixed(1))
+    series.push({ name: n1 + 'Bus V (scaled)', color: DEVICE1_COLORS.battBusV, values: alignSeries(mt, t.timestamps, scaled) })
+  }
+  if (hasCompare) {
+    const c = compareTrends.value
+    const n2 = compareDeviceName.value + ' '
+    if (hasData(c?.inaBattPcts)) series.push({ name: n2 + 'Battery %',    color: DEVICE2_COLORS.battPct,  values: alignSeries(mt, c.timestamps, c.inaBattPcts) })
+    if (hasData(c?.inaBusVs)) {
+      const scaled = c.inaBusVs.map(v => v == null ? null : +Math.max(0, Math.min(100, (v - 3.30) / (4.20 - 3.30) * 100)).toFixed(1))
+      series.push({ name: n2 + 'Bus V (scaled)', color: DEVICE2_COLORS.battBusV, values: alignSeries(mt, c.timestamps, scaled) })
+    }
+  }
+  return series
+})
+
+const battCurrentSeries = computed(() => {
+  const series = []
+  const t = trends.value
+  const mt = mergedTimestamps.value
+  const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
+  const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
+  if (hasData(t?.inaCurrentMas)) series.push({ name: n1 + 'Current (mA)', color: DEVICE1_COLORS.battCurrent, values: alignSeries(mt, t.timestamps, t.inaCurrentMas) })
+  if (hasCompare) {
+    const c = compareTrends.value
+    if (hasData(c?.inaCurrentMas)) series.push({ name: compareDeviceName.value + ' Current (mA)', color: DEVICE2_COLORS.battCurrent, values: alignSeries(mt, c.timestamps, c.inaCurrentMas) })
+  }
   return series
 })
 
@@ -1124,7 +1392,26 @@ function resolveRoomNameAfterSubmit(payload) {
 
 function selectDevice(device) {
   selectedDeviceUid.value = device.device_uid
+  if (process.client) localStorage.setItem("airbuddy-selected-device", device.device_uid)
 }
+
+function selectCompareDevice(device) {
+  if (compareDeviceUid.value === device.device_uid) {
+    compareDeviceUid.value = ""
+    if (process.client) localStorage.removeItem("airbuddy-compare-device")
+    return
+  }
+  if (device.device_uid === selectedDeviceUid.value) return
+  compareDeviceUid.value = device.device_uid
+  if (process.client) localStorage.setItem("airbuddy-compare-device", device.device_uid)
+}
+
+watch(selectedDeviceUid, (uid) => {
+  if (uid && uid === compareDeviceUid.value) {
+    compareDeviceUid.value = ""
+    if (process.client) localStorage.removeItem("airbuddy-compare-device")
+  }
+})
 
 function openDeviceModal(device) {
   activeDevice.value = device
@@ -1524,6 +1811,19 @@ pre {
   box-shadow: inset 0 0 0 1px rgba(49, 130, 206, 0.2);
 }
 
+/* ── Location panel ─────────────────────────────────────────────────────────── */
+.locationMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 0 2px;
+}
+
+.locationCoord {
+  white-space: nowrap;
+}
+
 /* ── Latest packets ─────────────────────────────────────────────────────────── */
 .packetHead {
   display: flex;
@@ -1686,6 +1986,37 @@ pre {
 .deviceCard.selected {
   border-color: rgba(49, 130, 206, 0.55);
   box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.18);
+}
+
+.deviceCard.compare {
+  border-color: rgba(13, 148, 136, 0.55);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.18);
+}
+
+.compareBtn {
+  margin-top: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.compareBtn:hover {
+  background: var(--btn-hover);
+  color: var(--text);
+}
+
+.compareBtn.compareActive {
+  border-color: rgba(13, 148, 136, 0.55);
+  color: rgba(13, 148, 136, 0.9);
+  background: rgba(13, 148, 136, 0.08);
 }
 
 .deviceCardHeader {
