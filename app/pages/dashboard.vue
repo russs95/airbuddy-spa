@@ -22,6 +22,7 @@
           {{ theme === "dark" ? "☀️" : "🌙" }}
         </button>
         <NuxtLink class="btn" to="/">Home</NuxtLink>
+        <NuxtLink class="btn" to="/displayer">Displayer</NuxtLink>
         <a class="btn btnGithub" href="https://github.com/russs95/airbuddy_v2" target="_blank" rel="noopener">
           <svg class="githubIcon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
@@ -76,19 +77,28 @@
             <div class="deviceCardTitle">
               {{ device.device_name || device.device_uid }}
             </div>
-            <button
-                class="deviceCardSettings"
-                type="button"
-                title="Device settings & key"
-                @click.stop="openDeviceModal(device)"
-            >⚙️</button>
+            <div class="deviceCardActions">
+              <span
+                  v-if="selectedDeviceUid === device.device_uid && live?.ens_aqi != null"
+                  class="deviceAqiEmoji"
+                  :title="`AQI ${live.ens_aqi}`"
+              >{{ aqiEmoji(live.ens_aqi) }}</span>
+              <span
+                  class="statusDot"
+                  :class="{ statusDotActive: isDeviceRecent(device) }"
+                  :title="isDeviceRecent(device) ? 'Active — reported in the last 5 minutes' : 'No recent data'"
+              ></span>
+              <button
+                  class="deviceCardSettings"
+                  type="button"
+                  title="Device settings & key"
+                  @click.stop="openDeviceModal(device)"
+              >⚙️</button>
+            </div>
           </div>
           <div class="muted tiny">{{ device.device_uid }}</div>
           <div class="muted tiny">
             {{ device.home_name || "No home" }}<span v-if="device.room_name"> · {{ device.room_name }}</span>
-          </div>
-          <div class="muted tiny">
-            Status: {{ device.status || "—" }}
           </div>
           <button
               v-if="selectedDeviceUid && selectedDeviceUid !== device.device_uid"
@@ -97,6 +107,27 @@
               type="button"
               @click.stop="selectCompareDevice(device)"
           >{{ compareDeviceUid === device.device_uid ? 'Comparing ✕' : 'Compare' }}</button>
+        </div>
+      </div>
+
+      <!-- IAQ composite score strip — shown below device grid when a device is selected -->
+      <div v-if="selectedDeviceUid && iaqScores.length" class="iaqStrip">
+        <div class="iaqStripLeft">
+          <div class="iaqStripScore" :style="{ color: iaqLineColor }">{{ iaqCurrentScore != null ? iaqCurrentScore.toFixed(1) : '—' }}</div>
+          <div class="iaqStripLabel">{{ iaqScoreLabel }}</div>
+          <div class="iaqStripSub">IAQ · 6h trend</div>
+        </div>
+        <div class="iaqStripChart">
+          <svg class="iaqSparkSvg" viewBox="0 0 600 56" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="dashIaqGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" :stop-color="iaqLineColor" stop-opacity="0.28"/>
+                <stop offset="100%" :stop-color="iaqLineColor" stop-opacity="0.03"/>
+              </linearGradient>
+            </defs>
+            <path :d="iaqFillD" fill="url(#dashIaqGrad)"/>
+            <polyline :points="iaqSparkPoints" fill="none" :stroke="iaqLineColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
         </div>
       </div>
     </section>
@@ -313,41 +344,107 @@
       </div>
     </section>
 
-    <!-- Current Location -->
+    <!-- Current Location / GPS Route -->
     <section v-if="me?.ok" class="card chartsPanel">
       <div class="chartCardHead">
-        <span class="chartsPanelTitle">Current Location</span>
-        <button
-            class="rangeBtn expandBtn"
-            @click="mapExpanded = !mapExpanded"
-            :title="mapExpanded ? 'Collapse map' : 'Expand map'"
-            :aria-pressed="mapExpanded"
-        >{{ mapExpanded ? '⊟' : '⊞' }}</button>
+        <span class="chartsPanelTitle">{{ gpsMode === 'route' ? 'GPS Route' : 'Current Location' }}</span>
+        <div class="mapControls">
+          <div class="rangeBar" role="group" aria-label="Map view">
+            <button
+                class="rangeBtn"
+                :class="{ active: gpsMode === 'location' }"
+                @click="gpsMode = 'location'"
+            >Location</button>
+            <button
+                class="rangeBtn"
+                :class="{ active: gpsMode === 'route' }"
+                @click="gpsMode = 'route'"
+            >Route</button>
+          </div>
+          <button
+              class="rangeBtn"
+              @click="openLocationModal"
+              title="Set device location manually"
+              :disabled="!selectedDeviceUid"
+          >⚙</button>
+          <button
+              class="rangeBtn expandBtn"
+              @click="mapExpanded = !mapExpanded"
+              :title="mapExpanded ? 'Collapse map' : 'Expand map'"
+              :aria-pressed="mapExpanded"
+          >{{ mapExpanded ? '⊟' : '⊞' }}</button>
+        </div>
       </div>
 
       <div v-if="!selectedDeviceUid" class="muted chartEmpty">Select a device to view location.</div>
-      <div v-else-if="livePending" class="muted chartEmpty">Loading…</div>
+      <div v-else-if="livePending && gpsMode === 'location'" class="muted chartEmpty">Loading…</div>
       <div v-else>
-        <LocationMap
-            :lat="live?.lat ?? null"
-            :lon="live?.lon ?? null"
-            :height="mapExpanded ? 420 : 180"
-            :theme="theme"
-        />
+        <div class="mapWrapper">
+          <LocationMap
+              :lat="live?.last_gps_lat ?? null"
+              :lon="live?.last_gps_lon ?? null"
+              :height="mapExpanded ? 420 : 180"
+              :theme="theme"
+              :mode="gpsMode"
+              :routeCoords="routeCoords"
+          />
+          <Transition name="mapFade">
+            <div v-if="routePending && gpsMode === 'route'" class="mapLoadingOverlay">
+              <span class="tiny">Updating route…</span>
+            </div>
+          </Transition>
+        </div>
 
         <div class="locationMeta tiny muted">
-          <template v-if="live?.lat != null && live?.lon != null">
-            <span class="locationCoord">
-              <strong>Lat:</strong> {{ Number(live.lat).toFixed(6) }}°
-            </span>
-            <span class="locationCoord">
-              <strong>Lon:</strong> {{ Number(live.lon).toFixed(6) }}°
-            </span>
-            <span v-if="live?.recorded_at">
-              <strong>As of:</strong> {{ live.recorded_at }}
-            </span>
+          <template v-if="gpsMode === 'location'">
+            <template v-if="live?.last_gps_lat != null && live?.last_gps_lon != null">
+              <span class="locationCoord">
+                <strong>Lat:</strong> {{ Number(live.last_gps_lat).toFixed(6) }}°
+              </span>
+              <span class="locationCoord">
+                <strong>Lon:</strong> {{ Number(live.last_gps_lon).toFixed(6) }}°
+              </span>
+              <span v-if="live?.last_gps_at">
+                <strong>As of:</strong> {{ live.last_gps_at }}
+              </span>
+              <span v-if="live?.last_gps_at !== live?.recorded_at" class="locationStale">
+                (GPS from earlier reading)
+              </span>
+            </template>
+            <span v-else class="muted">No GPS data found for this device.</span>
           </template>
-          <span v-else class="muted">No GPS coordinates in last packet.</span>
+          <template v-else>
+            <span v-if="routeCoords.length">
+              <strong>{{ routeCoords.length }}</strong> GPS point{{ routeCoords.length !== 1 ? 's' : '' }} · green = start, blue = latest
+            </span>
+            <span v-else class="muted">No GPS coordinates in this time range.</span>
+          </template>
+        </div>
+
+        <!-- Route time range slider -->
+        <div class="routeSliderWrap" :class="{ routeSliderActive: gpsMode === 'route' }">
+          <div class="routeSliderHead">
+            <span class="tiny muted">Route range</span>
+            <span class="routeSliderValue">{{ routeSliderSteps[routeSliderIndex].label }}</span>
+            <span v-if="routePending" class="tiny muted">Loading…</span>
+          </div>
+          <input
+              type="range"
+              min="0"
+              :max="routeSliderSteps.length - 1"
+              step="1"
+              v-model.number="routeSliderIndex"
+              class="routeSliderInput"
+              aria-label="Route time range"
+          />
+          <div class="routeSliderTicks tiny muted">
+            <span>15m</span>
+            <span>3h</span>
+            <span>12h</span>
+            <span>36h</span>
+            <span>72h</span>
+            <span>5d</span>
+          </div>
         </div>
       </div>
     </section>
@@ -355,43 +452,106 @@
     <!-- Latest packets -->
     <section v-if="me?.ok" class="card">
       <div class="packetHead">
-        <h2>Latest 10 Packets</h2>
-        <span class="tiny muted">{{ latestPackets.length }} shown</span>
+        <div>
+          <h2>Latest Packets</h2>
+          <span class="tiny muted">{{ allPackets.length }} total · page {{ packetPage + 1 }} of {{ totalPacketPages }}</span>
+        </div>
+        <div class="packetControls">
+          <div class="rangeBar" role="group" aria-label="Time range">
+            <button v-for="r in packetRangeKeys" :key="r"
+                class="rangeBtn"
+                :class="{ active: packetRange === r }"
+                @click="packetRange = r"
+            >{{ r }}</button>
+          </div>
+        </div>
       </div>
 
       <div v-if="!selectedDeviceUid" class="muted tiny">Select a device to view packets.</div>
-      <div v-else-if="trendsPending" class="muted tiny">Loading…</div>
-      <div v-else-if="!latestPackets.length" class="muted tiny">No recent packets available.</div>
+      <div v-else-if="packetTrendsPending" class="muted tiny">Loading…</div>
+      <div v-else-if="!allPackets.length" class="muted tiny">No packets in this time range.</div>
 
-      <div v-else class="packetTableWrap">
-        <table class="packetTable">
-          <thead>
-          <tr>
-            <th>Time</th>
-            <th>ENS CO₂</th>
-            <th>SCD CO₂</th>
-            <th>AHT Temp</th>
-            <th>SCD Temp</th>
-            <th>RTC Temp</th>
-            <th>AHT RH</th>
-            <th>SCD RH</th>
-            <th>TVOC</th>
-          </tr>
-          </thead>
-          <tbody>
-          <tr v-for="pkt in latestPackets" :key="pkt.ts">
-            <td>{{ pkt.timeLabel }}</td>
-            <td>{{ pkt.ensEco2 }}</td>
-            <td>{{ pkt.scdCo2 }}</td>
-            <td>{{ pkt.ahtTemp }}</td>
-            <td>{{ pkt.scdTemp }}</td>
-            <td>{{ pkt.rtcTemp }}</td>
-            <td>{{ pkt.ahtHumidity }}</td>
-            <td>{{ pkt.scdHumidity }}</td>
-            <td>{{ pkt.tvoc }}</td>
-          </tr>
-          </tbody>
-        </table>
+      <div v-else>
+        <div class="packetTableWrap">
+          <table class="packetTable">
+            <thead>
+            <tr>
+              <th class="checkCell">
+                <input
+                    ref="selectAllCheckbox"
+                    type="checkbox"
+                    :checked="allPageSelected"
+                    @change="toggleSelectAll"
+                    title="Select all on this page"
+                />
+              </th>
+              <th>Time</th>
+              <th>ENS CO₂</th>
+              <th>SCD CO₂</th>
+              <th>AHT Temp</th>
+              <th>SCD Temp</th>
+              <th>RTC Temp</th>
+              <th>TVOC</th>
+              <th>Lat</th>
+              <th>Lon</th>
+              <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr
+                v-for="pkt in paginatedPackets"
+                :key="pkt.ts"
+                :class="{ selectedRow: pkt.telemetryId && selectedPacketIds.has(pkt.telemetryId) }"
+            >
+              <td class="checkCell">
+                <input
+                    type="checkbox"
+                    :checked="pkt.telemetryId && selectedPacketIds.has(pkt.telemetryId)"
+                    @change="togglePacket(pkt.telemetryId)"
+                    :disabled="!pkt.telemetryId"
+                />
+              </td>
+              <td class="packetTime" :title="pkt.timeLabel">{{ pkt.timeLabelShort }}</td>
+              <td>{{ pkt.ensEco2 }}</td>
+              <td>{{ pkt.scdCo2 }}</td>
+              <td>{{ pkt.ahtTemp }}</td>
+              <td>{{ pkt.scdTemp }}</td>
+              <td>{{ pkt.rtcTemp }}</td>
+              <td>{{ pkt.tvoc }}</td>
+              <td class="packetCoord">{{ pkt.raw.lat != null ? Number(pkt.raw.lat).toFixed(4) : '—' }}</td>
+              <td class="packetCoord">{{ pkt.raw.lon != null ? Number(pkt.raw.lon).toFixed(4) : '—' }}</td>
+              <td class="packetGearCell">
+                <button class="packetGearBtn" type="button" title="View details" @click="openPacketModal(pkt)">⚙</button>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="selectedCount > 0" class="bulkActions">
+          <span class="tiny muted">{{ selectedCount }} selected</span>
+          <button
+              class="btn danger"
+              type="button"
+              @click="deleteSelectedPackets"
+              :disabled="bulkDeletePending"
+          >{{ bulkDeletePending ? 'Deleting…' : `Delete ${selectedCount} selected` }}</button>
+          <button class="btn" type="button" @click="clearSelection">Deselect all</button>
+          <span v-if="bulkDeleteError" class="errMsg tiny bulkErrMsg">{{ bulkDeleteError }}</span>
+        </div>
+
+        <div class="paginationBar">
+          <button class="btn" :disabled="packetPage === 0" @click="packetPage--">‹ Prev</button>
+          <span class="paginationInfo tiny muted">{{ packetPage + 1 }} / {{ totalPacketPages }}</span>
+          <button class="btn" :disabled="packetPage >= totalPacketPages - 1" @click="packetPage++">Next ›</button>
+          <div class="rangeBar paginationLimit" role="group" aria-label="Rows per page">
+            <button v-for="n in [10, 25, 100]" :key="n"
+                class="rangeBtn"
+                :class="{ active: packetLimit === n }"
+                @click="packetLimit = n"
+            >{{ n }}</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -412,6 +572,16 @@
       </div>
 
       <template v-else>
+        <div v-if="live?.ens_aqi != null" class="aqiBanner">
+          <span class="aqiBannerEmoji">{{ aqiEmoji(live.ens_aqi) }}</span>
+          <span class="aqiBannerLabel">AQI {{ live.ens_aqi }} —
+            <span v-if="live.ens_aqi <= 1">Excellent</span>
+            <span v-else-if="live.ens_aqi <= 2">Good</span>
+            <span v-else-if="live.ens_aqi <= 3">Moderate</span>
+            <span v-else-if="live.ens_aqi <= 4">Poor</span>
+            <span v-else>Very Poor</span>
+          </span>
+        </div>
         <div class="metricsGrid">
           <MetricCard label="CO₂" :value="formatMetric(live?.ens_eco2 ?? live?.scd_co2, 0)" unit="ppm" />
           <MetricCard label="Temperature" :value="formatMetric(live?.aht_temp ?? live?.scd_temp, 1)" unit="°C" />
@@ -585,6 +755,79 @@
       <div class="muted tiny">Click "Login" and come back here.</div>
     </section>
 
+    <!-- Packet Detail Modal -->
+    <div v-if="packetModalOpen" class="modalBackdrop" @click.self="closePacketModal">
+      <div class="modalCard">
+        <div class="modalHeader">
+          <div>
+            <h3 class="modalTitle">Telemetry Reading</h3>
+            <div class="muted tiny">{{ activePacket?.timeLabel }}</div>
+          </div>
+          <button class="btn" type="button" @click="closePacketModal">Close</button>
+        </div>
+
+        <div class="modalBody">
+          <div class="pktDetailGrid">
+
+            <div class="pktDetailSection">
+              <div class="pktDetailHead">Air Quality</div>
+              <div class="pktDetailRow"><span>ENS CO₂</span><span>{{ formatPacketValue(activePacket?.raw?.ensEco2, 0, 'ppm') }}</span></div>
+              <div class="pktDetailRow"><span>SCD CO₂</span><span>{{ formatPacketValue(activePacket?.raw?.scdCo2, 0, 'ppm') }}</span></div>
+              <div class="pktDetailRow"><span>TVOC</span><span>{{ formatPacketValue(activePacket?.raw?.tvoc, 0, 'ppb') }}</span></div>
+            </div>
+
+            <div class="pktDetailSection">
+              <div class="pktDetailHead">Temperature</div>
+              <div class="pktDetailRow"><span>AHT Temp</span><span>{{ formatPacketValue(activePacket?.raw?.ahtTemp, 1, '°C') }}</span></div>
+              <div class="pktDetailRow"><span>SCD Temp</span><span>{{ formatPacketValue(activePacket?.raw?.scdTemp, 1, '°C') }}</span></div>
+              <div class="pktDetailRow"><span>RTC Temp</span><span>{{ formatPacketValue(activePacket?.raw?.rtcTemp, 1, '°C') }}</span></div>
+            </div>
+
+            <div class="pktDetailSection">
+              <div class="pktDetailHead">Humidity</div>
+              <div class="pktDetailRow"><span>AHT RH</span><span>{{ formatPacketValue(activePacket?.raw?.ahtHumidity, 1, '%') }}</span></div>
+              <div class="pktDetailRow"><span>SCD RH</span><span>{{ formatPacketValue(activePacket?.raw?.scdHumidity, 1, '%') }}</span></div>
+            </div>
+
+            <div class="pktDetailSection">
+              <div class="pktDetailHead">Battery</div>
+              <div class="pktDetailRow"><span>Charge</span><span>{{ formatPacketValue(activePacket?.raw?.inaBattPct, 0, '%') }}</span></div>
+              <div class="pktDetailRow"><span>Bus V</span><span>{{ formatPacketValue(activePacket?.raw?.inaBusV, 2, 'V') }}</span></div>
+              <div class="pktDetailRow"><span>Current</span><span>{{ formatPacketValue(activePacket?.raw?.inaCurrentMa, 0, 'mA') }}</span></div>
+              <div class="pktDetailRow"><span>Power</span><span>{{ formatPacketValue(activePacket?.raw?.inaPowerMw, 0, 'mW') }}</span></div>
+            </div>
+
+            <div class="pktDetailSection">
+              <div class="pktDetailHead">GPS</div>
+              <div class="pktDetailRow"><span>Lat</span><span>{{ activePacket?.raw?.lat != null ? Number(activePacket.raw.lat).toFixed(6) + '°' : '—' }}</span></div>
+              <div class="pktDetailRow"><span>Lon</span><span>{{ activePacket?.raw?.lon != null ? Number(activePacket.raw.lon).toFixed(6) + '°' : '—' }}</span></div>
+            </div>
+
+            <div class="pktDetailSection">
+              <div class="pktDetailHead">Record</div>
+              <div class="pktDetailRow"><span>Telemetry ID</span><span class="tiny muted">{{ activePacket?.telemetryId ?? '—' }}</span></div>
+            </div>
+
+          </div>
+
+          <div class="divider"></div>
+
+          <div v-if="deleteError" class="message errMsg">{{ deleteError }}</div>
+
+          <div class="actions">
+            <button
+                class="btn danger"
+                type="button"
+                @click="deleteTelemetryReading"
+                :disabled="deletePending || !activePacket?.telemetryId"
+            >{{ deletePending ? 'Deleting…' : 'Delete Reading' }}</button>
+          </div>
+
+          <div class="muted tiny">Deleting this reading is permanent and cannot be undone.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Add Device Modal -->
     <div
         v-if="addDeviceModalOpen"
@@ -603,9 +846,13 @@
         <div class="modalBody">
           <form class="deviceForm" @submit.prevent="submitDevice">
             <div class="formRow">
-              <label class="label">Device UID (auto-assigned)</label>
-              <div class="uidPreview">{{ nextDeviceUid }}</div>
-              <div class="muted tiny">Assigned automatically based on next available device ID.</div>
+              <label class="label">Device UID</label>
+              <input
+                  v-model.trim="nextDeviceUid"
+                  class="input keyInput"
+                  placeholder="Fetching suggested ID…"
+              />
+              <div class="muted tiny">Auto-assigned based on your account — you can edit it before saving.</div>
             </div>
 
             <div class="formRow">
@@ -718,7 +965,7 @@
             </div>
 
             <div class="actions">
-              <button class="btn primary" type="submit" :disabled="submitPending">
+              <button class="btn primary" type="submit" :disabled="submitPending || !nextDeviceUid">
                 {{ submitPending ? "Saving..." : "Add Device" }}
               </button>
             </div>
@@ -743,11 +990,27 @@
     >
       <div class="modalCard">
         <div class="modalHeader">
-          <div>
-            <h3 class="modalTitle">
-              {{ activeDevice?.device_name || activeDevice?.device_uid || "Device" }}
-            </h3>
-            <div class="muted tiny">{{ activeDevice?.device_uid }}</div>
+          <div class="modalTitleBlock">
+            <div v-if="renamingDevice" class="renameRow">
+              <input
+                  v-model.trim="renameValue"
+                  class="input renameInput"
+                  placeholder="Device name"
+                  @keydown.enter="saveDeviceName"
+                  @keydown.escape="cancelRename"
+                  autofocus
+              />
+              <button class="btn primary iconBtnSm" type="button" @click="saveDeviceName" :disabled="renamePending" title="Save name">✓</button>
+              <button class="btn iconBtnSm" type="button" @click="cancelRename" title="Cancel">✕</button>
+            </div>
+            <div v-else class="modalTitleRow">
+              <h3 class="modalTitle editableTitle" @click="startRename" title="Click to edit name">{{ activeDevice?.device_name || activeDevice?.device_uid || "Device" }}</h3>
+            </div>
+            <div class="deviceUidRow muted tiny">
+              <code class="deviceUidCode">{{ activeDevice?.device_uid }}</code>
+              <button class="copyUidBtn" type="button" @click="copyDeviceUid" :title="uidCopied ? 'Copied!' : 'Copy device ID'">{{ uidCopied ? '✓' : '⎘' }}</button>
+            </div>
+            <div v-if="renameError" class="message errMsg renameErr">{{ renameError }}</div>
           </div>
 
           <button class="btn" type="button" @click="closeDeviceModal">Close</button>
@@ -757,7 +1020,6 @@
           <div class="deviceMeta">
             <div><strong>Home:</strong> {{ activeDevice?.home_name || "—" }}</div>
             <div><strong>Room:</strong> {{ activeDevice?.room_name || "—" }}</div>
-            <div><strong>Status:</strong> {{ activeDevice?.status || "—" }}</div>
           </div>
 
           <div class="divider"></div>
@@ -818,6 +1080,64 @@
         </div>
       </div>
     </div>
+
+    <!-- Set Location Modal -->
+    <div v-if="locationModalOpen" class="modalBackdrop" @click.self="closeLocationModal">
+      <div class="modalCard">
+        <div class="modalHeader">
+          <div>
+            <h3 class="modalTitle">Set Device Location</h3>
+            <div class="muted tiny">Manually pin a fixed location for this device</div>
+          </div>
+          <button class="btn" type="button" @click="closeLocationModal">Close</button>
+        </div>
+
+        <div class="modalBody">
+          <p class="muted tiny locationModalNote">
+            Use this for devices without GPS. Enter coordinates below and the backend will store them as the device's fixed location, returning them whenever telemetry has no GPS reading.
+          </p>
+
+          <div class="formRow">
+            <label class="label">Latitude</label>
+            <input
+                v-model="manualLat"
+                class="input"
+                type="number"
+                step="any"
+                min="-90"
+                max="90"
+                placeholder="e.g. 48.8566"
+            />
+          </div>
+
+          <div class="formRow">
+            <label class="label">Longitude</label>
+            <input
+                v-model="manualLon"
+                class="input"
+                type="number"
+                step="any"
+                min="-180"
+                max="180"
+                placeholder="e.g. 2.3522"
+            />
+          </div>
+
+          <div v-if="locationSaveError" class="message errMsg">{{ locationSaveError }}</div>
+          <div v-if="locationSaveOk" class="message okMsg">Location saved.</div>
+
+          <div class="actions">
+            <button class="btn primary" type="button" @click="saveDeviceLocation" :disabled="locationSavePending || !selectedDeviceUid">
+              {{ locationSavePending ? "Saving…" : "Set Location" }}
+            </button>
+          </div>
+
+          <div class="muted tiny">
+            The backend should store this on the device record so it persists regardless of future telemetry.
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -825,12 +1145,14 @@
 import AirTrendChart from '~/components/charts/AirTrendChart.vue'
 import LocationMap from '~/components/LocationMap.vue'
 import { mergeTimestamps, alignSeries } from '~/lib/mergeTimestamps'
+import { scoresFromTrends, iaqColor, iaqLabel as calcIaqLabel, sparklinePoints, sparklineFillPath } from '../lib/iaqScore'
 
 useHead({ title: 'AirBuddy | Beta Dashboard' })
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 const theme = ref("light")
 let nowTimer = null
+let routeDebounceTimer = null
 
 onMounted(() => {
   const saved = localStorage.getItem("airbuddy-theme")
@@ -846,6 +1168,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (nowTimer) clearInterval(nowTimer)
+  clearTimeout(routeDebounceTimer)
 })
 
 watch(theme, (v) => {
@@ -899,11 +1222,7 @@ const {
 const homes = computed(() => bootstrap.value?.homes || [])
 const devices = computed(() => devicesData.value?.devices || [])
 
-const nextDeviceId = computed(() => {
-  if (!devices.value.length) return 1
-  return Math.max(...devices.value.map(d => Number(d.device_id) || 0)) + 1
-})
-const nextDeviceUid = computed(() => `AB_0${nextDeviceId.value}`)
+const nextDeviceUid = ref("")
 
 const bootstrapErrorMessage = computed(() => {
   const e = bootstrapError.value
@@ -981,7 +1300,7 @@ const selectedDeviceLabel = computed(() =>
 )
 
 // ── Chart ranges & threshold bands ──────────────────────────────────────────
-const trendRangeKeys = ["15m", "30m", "1h", "3h", "6h", "12h", "24h", "36h", "72h", "7d", "30d"]
+const trendRangeKeys = ["15m", "30m", "1h", "3h", "6h", "12h", "24h", "36h", "50h", "72h", "5d", "7d", "30d"]
 
 const universalRange = ref("1h")
 
@@ -993,7 +1312,90 @@ const chartExpanded = reactive({
   battery: false,
 })
 
-const mapExpanded = ref(false)
+const mapExpanded = ref(true)
+const gpsMode = ref('location')
+const packetLimit = ref(10)
+
+const routeSliderSteps = [
+  { label: '15m', hours: 0.25 },
+  { label: '30m', hours: 0.5 },
+  { label: '1h',  hours: 1 },
+  { label: '2h',  hours: 2 },
+  { label: '3h',  hours: 3 },
+  { label: '6h',  hours: 6 },
+  { label: '9h',  hours: 9 },
+  { label: '12h', hours: 12 },
+  { label: '18h', hours: 18 },
+  { label: '24h', hours: 24 },
+  { label: '36h', hours: 36 },
+  { label: '48h', hours: 48 },
+  { label: '50h', hours: 50 },
+  { label: '72h', hours: 72 },
+  { label: '5d',  hours: 120 },
+]
+const routeSliderIndex = ref(2) // default 1h
+// Separate ref driven by debounced slider changes — prevents fetch-on-every-drag
+const routeHoursFetched = ref(1)
+watch(routeSliderIndex, (idx) => {
+  clearTimeout(routeDebounceTimer)
+  routeDebounceTimer = setTimeout(() => {
+    routeHoursFetched.value = routeSliderSteps[idx].hours
+  }, 400)
+})
+
+const {
+  data: routeTrends,
+  pending: routePending,
+} = await useFetch("/api/dashboard/device-trends", {
+  credentials: "include",
+  headers: { "Cache-Control": "no-cache" },
+  query: computed(() => ({
+    device_uid: selectedDeviceUid.value || undefined,
+    hours: routeHoursFetched.value,
+  })),
+  watch: [selectedDeviceUid, routeHoursFetched],
+  immediate: true,
+})
+
+// ── Packet panel — independent fetch & range ─────────────────────────────────
+const packetRangeKeys = ["1h", "3h", "6h", "12h", "24h", "50h", "5d", "7d", "30d"]
+const PACKET_RANGE_HOURS = {
+  '1h': 1, '3h': 3, '6h': 6, '12h': 12, '24h': 24, '50h': 50, '5d': 120, '7d': 168, '30d': 720,
+}
+const packetRange = ref("24h")
+
+const {
+  data: packetTrends,
+  pending: packetTrendsPending,
+  refresh: refreshPacketTrends,
+} = await useFetch("/api/dashboard/device-trends", {
+  credentials: "include",
+  headers: { "Cache-Control": "no-cache" },
+  query: computed(() => ({
+    device_uid: selectedDeviceUid.value || undefined,
+    hours: PACKET_RANGE_HOURS[packetRange.value] ?? 24,
+  })),
+  watch: [selectedDeviceUid, packetRange],
+  immediate: true,
+})
+
+const packetPage = ref(0)
+watch([selectedDeviceUid, packetLimit, packetRange], () => { packetPage.value = 0 })
+
+const routeCoords = computed(() => {
+  const lats = routeTrends.value?.lats ?? []
+  const lons = routeTrends.value?.lons ?? []
+  const timestamps = routeTrends.value?.timestamps ?? []
+  const pairs = []
+  for (let i = 0; i < Math.min(lats.length, lons.length); i++) {
+    const lat = Number(lats[i])
+    const lon = Number(lons[i])
+    if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)) {
+      pairs.push([lat, lon, timestamps[i] ?? null])
+    }
+  }
+  return pairs
+})
 
 const eco2ThresholdBands = [
   { label: 'Good',      from: 0,    to: 800,      color: 'rgba(34,197,94,0.10)'  },
@@ -1039,6 +1441,7 @@ const {
   data: live,
   pending: livePending,
   error: liveError,
+  refresh: refreshLive,
 } = await useFetch("/api/dashboard/device-live", {
   credentials: "include",
   headers: { "Cache-Control": "no-cache" },
@@ -1049,13 +1452,14 @@ const {
 
 const RANGE_FETCH_HOURS = {
   '15m': 1, '30m': 1, '1h': 2, '3h': 4, '6h': 7, '12h': 13, '24h': 25,
-  '36h': 37, '72h': 73, '7d': 169, '30d': 721,
+  '36h': 37, '50h': 51, '72h': 73, '5d': 121, '7d': 169, '30d': 721,
 }
 
 const {
   data: trends,
   pending: trendsPending,
   error: trendsError,
+  refresh: refreshTrends,
 } = await useFetch("/api/dashboard/device-trends", {
   credentials: "include",
   headers: { "Cache-Control": "no-cache" },
@@ -1066,6 +1470,27 @@ const {
   watch: [selectedDeviceUid, universalRange],
   immediate: true,
 })
+
+const { data: iaqTrends } = await useFetch("/api/dashboard/device-trends", {
+  credentials: "include",
+  headers: { "Cache-Control": "no-cache" },
+  query: computed(() => ({
+    device_uid: selectedDeviceUid.value || undefined,
+    hours: 7,
+  })),
+  watch: [selectedDeviceUid],
+  immediate: true,
+})
+
+const iaqScores = computed(() => scoresFromTrends(iaqTrends.value))
+const iaqCurrentScore = computed(() => {
+  const s = iaqScores.value
+  return s.length ? s[s.length - 1] : null
+})
+const iaqLineColor = computed(() => iaqCurrentScore.value != null ? iaqColor(iaqCurrentScore.value) : '#94a3b8')
+const iaqScoreLabel = computed(() => iaqCurrentScore.value != null ? calcIaqLabel(iaqCurrentScore.value) : '—')
+const iaqSparkPoints = computed(() => sparklinePoints(iaqScores.value, 600, 56))
+const iaqFillD = computed(() => sparklineFillPath(iaqScores.value, 600, 56))
 
 const { data: compareTrends } = await useFetch("/api/dashboard/device-trends", {
   credentials: "include",
@@ -1115,6 +1540,20 @@ function formatPacketTime(ts) {
   const n = Number(ts)
   if (!Number.isFinite(n)) return "—"
   return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(n * 1000))
+}
+
+function formatPacketTimeShort(ts) {
+  const n = Number(ts)
+  if (!Number.isFinite(n)) return "—"
+  return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -1126,6 +1565,16 @@ function formatPacketValue(value, decimals = 0, unit = "") {
   const n = Number(value)
   if (!Number.isFinite(n)) return "—"
   return `${n.toFixed(decimals)}${unit ? ` ${unit}` : ""}`
+}
+
+function aqiEmoji(aqi) {
+  const n = Number(aqi)
+  if (!Number.isFinite(n)) return ""
+  if (n <= 1) return "😄"
+  if (n <= 2) return "🙂"
+  if (n <= 3) return "😐"
+  if (n <= 4) return "😟"
+  return "😰"
 }
 
 // ── Multi-sensor chart series ────────────────────────────────────────────────
@@ -1237,34 +1686,181 @@ const battCurrentSeries = computed(() => {
   return series
 })
 
-const latestPackets = computed(() => {
-  const ts              = Array.isArray(trends.value?.timestamps)    ? trends.value.timestamps    : []
-  const ensEco2s        = Array.isArray(trends.value?.ensEco2s)      ? trends.value.ensEco2s      : []
-  const scdCo2s         = Array.isArray(trends.value?.scdCo2s)       ? trends.value.scdCo2s       : []
-  const ahtTemps        = Array.isArray(trends.value?.ahtTemps)      ? trends.value.ahtTemps      : []
-  const scdTemps        = Array.isArray(trends.value?.scdTemps)      ? trends.value.scdTemps      : []
-  const rtcTemps        = Array.isArray(trends.value?.rtcTemps)      ? trends.value.rtcTemps      : []
-  const ahtHumidities   = Array.isArray(trends.value?.ahtHumidities) ? trends.value.ahtHumidities : []
-  const scdHumidities   = Array.isArray(trends.value?.scdHumidities) ? trends.value.scdHumidities : []
-  const ensTvocs        = Array.isArray(trends.value?.ensTvocs)      ? trends.value.ensTvocs      : []
+const allPackets = computed(() => {
+  const d             = packetTrends.value
+  const telemetryIds  = Array.isArray(d?.telemetryIds)   ? d.telemetryIds  : []
+  const ts            = Array.isArray(d?.timestamps)      ? d.timestamps    : []
+  const ensEco2s      = Array.isArray(d?.ensEco2s)        ? d.ensEco2s      : []
+  const scdCo2s       = Array.isArray(d?.scdCo2s)         ? d.scdCo2s       : []
+  const ahtTemps      = Array.isArray(d?.ahtTemps)        ? d.ahtTemps      : []
+  const scdTemps      = Array.isArray(d?.scdTemps)        ? d.scdTemps      : []
+  const rtcTemps      = Array.isArray(d?.rtcTemps)        ? d.rtcTemps      : []
+  const ahtHumidities = Array.isArray(d?.ahtHumidities)   ? d.ahtHumidities : []
+  const scdHumidities = Array.isArray(d?.scdHumidities)   ? d.scdHumidities : []
+  const ensTvocs      = Array.isArray(d?.ensTvocs)        ? d.ensTvocs      : []
+  const inaBusVs      = Array.isArray(d?.inaBusVs)        ? d.inaBusVs      : []
+  const inaCurrentMas = Array.isArray(d?.inaCurrentMas)   ? d.inaCurrentMas : []
+  const inaPowerMws   = Array.isArray(d?.inaPowerMws)     ? d.inaPowerMws   : []
+  const inaBattPcts   = Array.isArray(d?.inaBattPcts)     ? d.inaBattPcts   : []
+  const lats          = Array.isArray(d?.lats)            ? d.lats          : []
+  const lons          = Array.isArray(d?.lons)            ? d.lons          : []
 
   return ts
       .map((t, i) => ({
-        ts:          Number(t) || i,
-        timeLabel:   formatPacketTime(t),
-        ensEco2:     formatPacketValue(ensEco2s[i],       0, "ppm"),
-        scdCo2:      formatPacketValue(scdCo2s[i],        0, "ppm"),
-        ahtTemp:     formatPacketValue(ahtTemps[i],       1, "°C"),
-        scdTemp:     formatPacketValue(scdTemps[i],       1, "°C"),
-        rtcTemp:     formatPacketValue(rtcTemps[i],       1, "°C"),
-        ahtHumidity: formatPacketValue(ahtHumidities[i],  1, "%"),
-        scdHumidity: formatPacketValue(scdHumidities[i],  1, "%"),
-        tvoc:        formatPacketValue(ensTvocs[i],        0, "ppb"),
+        ts:             Number(t) || i,
+        telemetryId:    telemetryIds[i] ?? null,
+        timeLabel:      formatPacketTime(t),
+        timeLabelShort: formatPacketTimeShort(t),
+        ensEco2:        formatPacketValue(ensEco2s[i],  0, "ppm"),
+        scdCo2:         formatPacketValue(scdCo2s[i],   0, "ppm"),
+        ahtTemp:        formatPacketValue(ahtTemps[i],  1, "°C"),
+        scdTemp:        formatPacketValue(scdTemps[i],  1, "°C"),
+        rtcTemp:        formatPacketValue(rtcTemps[i],  1, "°C"),
+        tvoc:           formatPacketValue(ensTvocs[i],  0, "ppb"),
+        raw: {
+          ensEco2:      ensEco2s[i]      ?? null,
+          scdCo2:       scdCo2s[i]       ?? null,
+          ahtTemp:      ahtTemps[i]      ?? null,
+          scdTemp:      scdTemps[i]      ?? null,
+          rtcTemp:      rtcTemps[i]      ?? null,
+          tvoc:         ensTvocs[i]      ?? null,
+          ahtHumidity:  ahtHumidities[i] ?? null,
+          scdHumidity:  scdHumidities[i] ?? null,
+          inaBusV:      inaBusVs[i]      ?? null,
+          inaCurrentMa: inaCurrentMas[i] ?? null,
+          inaPowerMw:   inaPowerMws[i]   ?? null,
+          inaBattPct:   inaBattPcts[i]   ?? null,
+          lat:          lats[i]          ?? null,
+          lon:          lons[i]          ?? null,
+        },
       }))
       .filter(r => Number.isFinite(r.ts))
       .sort((a, b) => b.ts - a.ts)
-      .slice(0, 10)
 })
+
+const totalPacketPages = computed(() => Math.max(1, Math.ceil(allPackets.value.length / packetLimit.value)))
+
+const paginatedPackets = computed(() => {
+  const start = packetPage.value * packetLimit.value
+  return allPackets.value.slice(start, start + packetLimit.value)
+})
+
+// ── Packet detail modal ──────────────────────────────────────────────────────
+const packetModalOpen = ref(false)
+const activePacket = ref(null)
+const deletePending = ref(false)
+const deleteError = ref("")
+const deleteSuccess = ref(false)
+
+function openPacketModal(pkt) {
+  activePacket.value = pkt
+  packetModalOpen.value = true
+  deletePending.value = false
+  deleteError.value = ""
+  deleteSuccess.value = false
+}
+
+function closePacketModal() {
+  packetModalOpen.value = false
+  activePacket.value = null
+  deletePending.value = false
+  deleteError.value = ""
+  deleteSuccess.value = false
+}
+
+async function deleteTelemetryReading() {
+  if (!activePacket.value?.telemetryId) return
+  try {
+    deletePending.value = true
+    deleteError.value = ""
+    await $fetch(`/api/dashboard/telemetry/${activePacket.value.telemetryId}`, {
+      method: "DELETE",
+      credentials: "include",
+    })
+    deleteSuccess.value = true
+    closePacketModal()
+    await refreshTrends()
+  } catch (e) {
+    deleteError.value = e?.data?.message || e?.message || "Could not delete reading."
+  } finally {
+    deletePending.value = false
+  }
+}
+
+// ── Packet multi-select & bulk delete ────────────────────────────────────────
+const selectedPacketIds = ref(new Set())
+const bulkDeletePending = ref(false)
+const bulkDeleteError = ref("")
+const selectAllCheckbox = ref(null)
+
+const selectedCount = computed(() => selectedPacketIds.value.size)
+
+const allPageSelected = computed(() =>
+  paginatedPackets.value.length > 0 &&
+  paginatedPackets.value.filter(p => p.telemetryId).every(p => selectedPacketIds.value.has(p.telemetryId))
+)
+
+const somePageSelected = computed(() =>
+  paginatedPackets.value.some(p => p.telemetryId && selectedPacketIds.value.has(p.telemetryId))
+)
+
+watchEffect(() => {
+  if (selectAllCheckbox.value) {
+    selectAllCheckbox.value.indeterminate = somePageSelected.value && !allPageSelected.value
+  }
+})
+
+watch([selectedDeviceUid, packetRange], () => { selectedPacketIds.value = new Set() })
+
+function togglePacket(id) {
+  if (!id) return
+  const s = new Set(selectedPacketIds.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  selectedPacketIds.value = s
+}
+
+function toggleSelectAll() {
+  if (allPageSelected.value) {
+    const s = new Set(selectedPacketIds.value)
+    paginatedPackets.value.forEach(p => { if (p.telemetryId) s.delete(p.telemetryId) })
+    selectedPacketIds.value = s
+  } else {
+    const s = new Set(selectedPacketIds.value)
+    paginatedPackets.value.forEach(p => { if (p.telemetryId) s.add(p.telemetryId) })
+    selectedPacketIds.value = s
+  }
+}
+
+function clearSelection() {
+  selectedPacketIds.value = new Set()
+  bulkDeleteError.value = ""
+}
+
+async function deleteSelectedPackets() {
+  const ids = [...selectedPacketIds.value]
+  if (!ids.length) return
+  if (!window.confirm(`Delete ${ids.length} reading${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) return
+
+  bulkDeletePending.value = true
+  bulkDeleteError.value = ""
+  let errors = 0
+
+  for (const id of ids) {
+    try {
+      await $fetch(`/api/dashboard/telemetry/${id}`, { method: "DELETE", credentials: "include" })
+    } catch {
+      errors++
+    }
+  }
+
+  bulkDeletePending.value = false
+  selectedPacketIds.value = new Set()
+  if (errors > 0) {
+    bulkDeleteError.value = `${errors} reading${errors !== 1 ? 's' : ''} could not be deleted.`
+  }
+  await refreshPacketTrends()
+}
 
 // ── Add Device form ──────────────────────────────────────────────────────────
 const form = reactive({
@@ -1318,11 +1914,24 @@ const deviceKeyMessage = ref("")
 const showDeviceKey = ref(false)
 const resetPending = ref(false)
 const copyPending = ref(false)
+const renamingDevice = ref(false)
+const renameValue = ref("")
+const renamePending = ref(false)
+const renameError = ref("")
+const uidCopied = ref(false)
 
-function openAddDeviceModal() {
+async function openAddDeviceModal() {
   addDeviceModalOpen.value = true
   submitMessage.value = ""
   submitError.value = ""
+  nextDeviceUid.value = ""
+  try {
+    const res = await $fetch("/api/devices/next-uid", { credentials: "include" })
+    nextDeviceUid.value = res?.next_device_uid || ""
+  } catch (e) {
+    console.error("[add-device] next-uid fetch failed:", e)
+    submitError.value = e?.data?.message || e?.message || "Could not fetch next device ID. Please try again."
+  }
 }
 
 function closeAddDeviceModal() {
@@ -1421,6 +2030,9 @@ function openDeviceModal(device) {
   showDeviceKey.value = false
   copyPending.value = false
   resetPending.value = false
+  renamingDevice.value = false
+  renameError.value = ""
+  uidCopied.value = false
 }
 
 function closeDeviceModal() {
@@ -1432,6 +2044,117 @@ function closeDeviceModal() {
   showDeviceKey.value = false
   copyPending.value = false
   resetPending.value = false
+  renamingDevice.value = false
+  renameError.value = ""
+  uidCopied.value = false
+}
+
+function startRename() {
+  renameValue.value = activeDevice.value?.device_name || ""
+  renamingDevice.value = true
+  renameError.value = ""
+}
+
+function cancelRename() {
+  renamingDevice.value = false
+  renameError.value = ""
+}
+
+async function saveDeviceName() {
+  if (!activeDevice.value?.device_id) return
+  const newName = renameValue.value.trim()
+  if (!newName) { renameError.value = "Name cannot be empty."; return }
+  try {
+    renamePending.value = true
+    renameError.value = ""
+    await $fetch(`/api/devices/${activeDevice.value.device_id}/rename`, {
+      method: "POST",
+      credentials: "include",
+      body: { device_name: newName },
+    })
+    activeDevice.value = { ...activeDevice.value, device_name: newName }
+    renamingDevice.value = false
+    await refreshDevices()
+  } catch (e) {
+    renameError.value = e?.data?.message || e?.message || "Could not rename device."
+  } finally {
+    renamePending.value = false
+  }
+}
+
+async function copyDeviceUid() {
+  if (!activeDevice.value?.device_uid) return
+  try {
+    await navigator.clipboard.writeText(activeDevice.value.device_uid)
+    uidCopied.value = true
+    setTimeout(() => { uidCopied.value = false }, 2000)
+  } catch (e) {}
+}
+
+// ── Device activity indicator ────────────────────────────────────────────────
+function isDeviceRecent(device) {
+  // Prefer last_seen from the device record (requires backend to return it)
+  if (device.last_seen) {
+    return Date.now() - new Date(device.last_seen).getTime() < 5 * 60 * 1000
+  }
+  // Fallback: use live data for the currently-selected device
+  if (device.device_uid === selectedDeviceUid.value && live.value?.received_at) {
+    return Date.now() - new Date(live.value.received_at).getTime() < 5 * 60 * 1000
+  }
+  return false
+}
+
+// ── Set Device Location modal ────────────────────────────────────────────────
+const locationModalOpen = ref(false)
+const manualLat = ref("")
+const manualLon = ref("")
+const locationSavePending = ref(false)
+const locationSaveError = ref("")
+const locationSaveOk = ref(false)
+
+function openLocationModal() {
+  locationModalOpen.value = true
+  locationSaveError.value = ""
+  locationSaveOk.value = false
+  manualLat.value = live.value?.last_gps_lat != null ? String(live.value.last_gps_lat) : ""
+  manualLon.value = live.value?.last_gps_lon != null ? String(live.value.last_gps_lon) : ""
+}
+
+function closeLocationModal() {
+  locationModalOpen.value = false
+  locationSaveError.value = ""
+  locationSaveOk.value = false
+}
+
+async function saveDeviceLocation() {
+  const device = devices.value.find(d => d.device_uid === selectedDeviceUid.value)
+  if (!device?.device_id) return
+  const lat = Number(manualLat.value)
+  const lon = Number(manualLon.value)
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    locationSaveError.value = "Invalid latitude — must be between −90 and 90."
+    return
+  }
+  if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+    locationSaveError.value = "Invalid longitude — must be between −180 and 180."
+    return
+  }
+  try {
+    locationSavePending.value = true
+    locationSaveError.value = ""
+    await $fetch(`/api/devices/${device.device_id}/set-location`, {
+      method: "POST",
+      credentials: "include",
+      body: { lat, lon },
+    })
+    locationSaveOk.value = true
+    await refreshLive()
+    setTimeout(() => closeLocationModal(), 1200)
+  } catch (e) {
+    locationSaveError.value = e?.data?.message || e?.message || "Could not set location."
+  } finally {
+    locationSavePending.value = false
+  }
 }
 
 function toggleShowKey() {
@@ -1812,6 +2535,86 @@ pre {
 }
 
 /* ── Location panel ─────────────────────────────────────────────────────────── */
+.mapControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mapWrapper {
+  position: relative;
+}
+
+.mapLoadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  z-index: 10;
+  color: #fff;
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.mapFade-enter-active,
+.mapFade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.mapFade-enter-from,
+.mapFade-leave-to {
+  opacity: 0;
+}
+
+.locationStale {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* ── Route slider ────────────────────────────────────────────────────────────── */
+.routeSliderWrap {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.routeSliderWrap.routeSliderActive {
+  opacity: 1;
+}
+
+.routeSliderHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.routeSliderValue {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 32px;
+}
+
+.routeSliderInput {
+  width: 100%;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  height: 4px;
+}
+
+.routeSliderTicks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  padding: 0 2px;
+}
+
 .locationMeta {
   display: flex;
   flex-wrap: wrap;
@@ -1827,15 +2630,144 @@ pre {
 /* ── Latest packets ─────────────────────────────────────────────────────────── */
 .packetHead {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .packetHead h2 {
-  margin: 0;
+  margin: 0 0 2px;
   font-size: 18px;
+}
+
+.packetControls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.packetTime {
+  white-space: nowrap;
+  font-size: 12px;
+  cursor: default;
+}
+
+.packetCoord {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 2px;
+  flex-wrap: wrap;
+}
+
+.paginationInfo {
+  min-width: 60px;
+  text-align: center;
+}
+
+.paginationLimit {
+  margin-left: 6px;
+  border-left: 1px solid var(--border);
+  padding-left: 10px;
+}
+
+.checkCell {
+  width: 36px;
+  padding: 6px 10px !important;
+  text-align: center;
+}
+
+.packetTable tbody tr.selectedRow {
+  background: rgba(49, 130, 206, 0.09) !important;
+}
+
+.wrap[data-theme="dark"] .packetTable tbody tr.selectedRow {
+  background: rgba(59, 130, 246, 0.14) !important;
+}
+
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px 2px;
+  flex-wrap: wrap;
+}
+
+.bulkErrMsg {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(180, 35, 24, 0.08);
+  color: #b00;
+}
+
+.packetGearCell {
+  padding: 6px 8px !important;
+  text-align: center;
+}
+
+.packetGearBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.packetGearBtn:hover {
+  opacity: 1;
+  background: var(--btn-hover);
+}
+
+/* ── Packet detail modal ─────────────────────────────────────────────────────── */
+.pktDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.pktDetailSection {
+  display: grid;
+  gap: 6px;
+}
+
+.pktDetailHead {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pktDetailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.pktDetailRow span:first-child {
+  color: var(--muted);
 }
 
 .packetTableWrap {
@@ -1871,6 +2803,28 @@ pre {
 
 .packetTable tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* ── AQI banner ──────────────────────────────────────────────────────────────── */
+.aqiBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.aqiBannerEmoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.aqiBannerLabel {
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* ── Latest telemetry metrics ────────────────────────────────────────────────── */
@@ -2027,6 +2981,19 @@ pre {
   margin-bottom: 6px;
 }
 
+.deviceCardActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.deviceAqiEmoji {
+  font-size: 16px;
+  line-height: 1;
+  cursor: default;
+}
+
 .deviceCardSettings {
   flex-shrink: 0;
   display: inline-flex;
@@ -2144,7 +3111,118 @@ pre {
   color: #b00;
 }
 
+/* ── Status dot ─────────────────────────────────────────────────────────────── */
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.statusDotActive {
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45);
+  animation: dotPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
+  65%  { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
 /* ── Device detail modal ────────────────────────────────────────────────────── */
+.modalTitleBlock {
+  display: grid;
+  gap: 4px;
+}
+
+.modalTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editableTitle {
+  cursor: text;
+  transition: color 0.15s ease;
+  display: inline-block;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.editableTitle:hover {
+  color: #3b82f6;
+}
+
+.locationModalNote {
+  line-height: 1.6;
+}
+
+.renameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.renameInput {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.iconBtnSm {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 14px;
+}
+
+.renameErr {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.deviceUidRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.deviceUidCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  background: var(--pre-bg);
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.copyUidBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.55;
+  color: inherit;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.copyUidBtn:hover {
+  opacity: 1;
+  background: var(--btn-hover);
+}
+
 .keyBlock {
   display: grid;
   gap: 8px;
@@ -2200,6 +3278,60 @@ pre {
 .deviceMeta {
   display: grid;
   gap: 6px;
+}
+
+/* ── IAQ strip ───────────────────────────────────────────────────────────────── */
+.iaqStrip {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--card-bg, rgba(0,0,0,0.04));
+  border: 1px solid var(--border, rgba(0,0,0,0.08));
+}
+[data-theme="dark"] .iaqStrip {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+}
+.iaqStripLeft {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 6rem;
+  flex-shrink: 0;
+}
+.iaqStripScore {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.iaqStripLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  margin-top: 0.2rem;
+}
+.iaqStripSub {
+  font-size: 0.68rem;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 0.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.iaqStripChart {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.iaqSparkSvg {
+  width: 100%;
+  height: 56px;
+  display: block;
+  overflow: visible;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */

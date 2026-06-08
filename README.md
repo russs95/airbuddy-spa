@@ -24,3 +24,5 @@ Run migrations for new schema
 Run that API on port 3002 (systemd service)
 
 Update Nginx: air2 /api → 127.0.0.1:3002
+
+npm run dev
