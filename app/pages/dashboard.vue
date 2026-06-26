@@ -22,6 +22,7 @@
           {{ theme === "dark" ? "☀️" : "🌙" }}
         </button>
         <NuxtLink class="btn" to="/">Home</NuxtLink>
+        <NuxtLink v-if="me?.ok" class="btn" to="/profile">Profile</NuxtLink>
         <NuxtLink class="btn" to="/displayer">Displayer</NuxtLink>
         <a class="btn btnGithub" href="https://github.com/russs95/airbuddy_v2" target="_blank" rel="noopener">
           <svg class="githubIcon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
@@ -473,7 +474,7 @@
 
       <div v-else>
         <div class="packetTableWrap">
-          <table class="packetTable">
+          <table class="packetTable" :class="{ 'packets-manage-mode': packetsManageMode }">
             <thead>
             <tr>
               <th class="checkCell">
@@ -541,6 +542,7 @@
         </div>
 
         <div class="paginationBar">
+          <button class="btn" type="button" @click="toggleManageMode">{{ packetsManageMode ? 'Done' : 'Manage Telemetry' }}</button>
           <button class="btn" :disabled="packetPage === 0" @click="packetPage--">‹ Prev</button>
           <span class="paginationInfo tiny muted">{{ packetPage + 1 }} / {{ totalPacketPages }}</span>
           <button class="btn" :disabled="packetPage >= totalPacketPages - 1" @click="packetPage++">Next ›</button>
@@ -1837,6 +1839,14 @@ function clearSelection() {
   bulkDeleteError.value = ""
 }
 
+// Hide the checkbox column behind a "Manage Telemetry" toggle so the default
+// view stays read-only and uncluttered. Exiting manage mode drops any selection.
+const packetsManageMode = ref(false)
+function toggleManageMode() {
+  packetsManageMode.value = !packetsManageMode.value
+  if (!packetsManageMode.value) clearSelection()
+}
+
 async function deleteSelectedPackets() {
   const ids = [...selectedPacketIds.value]
   if (!ids.length) return
@@ -2686,6 +2696,11 @@ pre {
   width: 36px;
   padding: 6px 10px !important;
   text-align: center;
+  display: none;                 /* hidden by default — read-only view */
+}
+
+.packetTable.packets-manage-mode .checkCell {
+  display: table-cell;           /* revealed only while managing telemetry */
 }
 
 .packetTable tbody tr.selectedRow {

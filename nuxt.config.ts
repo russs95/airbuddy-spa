@@ -4,6 +4,22 @@ export default defineNuxtConfig({
 
   modules: ['@nuxt/ui'],
 
+  app: {
+    head: {
+      meta: [
+        // OSM tile servers return 403 ("Referrer is required") when the browser
+        // sends no Referer. Pin the document referrer policy so map tiles load
+        // regardless of any stricter policy set by the serving layer.
+        { name: 'referrer', content: 'strict-origin-when-cross-origin' },
+      ],
+      script: [
+        // FontAwesome Kit (shared with hopeturtles.org account) — enables the
+        // `fa-solid fa-*` icon classes used in the dashboard & profile views.
+        { src: 'https://kit.fontawesome.com/735e38ff98.js', crossorigin: 'anonymous' },
+      ],
+    },
+  },
+
   css: ['~/assets/css/main.css'],
 
   ui: {

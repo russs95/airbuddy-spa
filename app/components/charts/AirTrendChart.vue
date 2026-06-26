@@ -239,13 +239,21 @@ const chartOption = computed(() => {
       axisLabel: {
         color: c.axisLabel,
         fontSize: 11,
+        // Backstop: let ECharts drop any label that would collide with the previous
+        // one, regardless of viewport width.
+        hideOverlap: true,
         formatter: (val: number) => {
           const hours = RANGE_HOURS[props.range ?? '1h'] ?? 1
+          // On narrow screens the "12 Jun 14:00" form is too wide and ticks collide,
+          // so drop the date portion for sub-7d ranges — the range selector gives context.
+          const narrow = typeof window !== 'undefined' && window.innerWidth < 480
           if (hours >= 168) {
             return new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric' }).format(new Date(val))
           }
           if (hours >= 24) {
-            return new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(val))
+            return narrow
+              ? new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(val))
+              : new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(val))
           }
           return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(val))
         },
