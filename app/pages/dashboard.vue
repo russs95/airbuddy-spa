@@ -22,6 +22,9 @@
           {{ theme === "dark" ? "☀️" : "🌙" }}
         </button>
         <NuxtLink class="btn" to="/">Home</NuxtLink>
+        <NuxtLink class="btn" to="/dashboard-june">
+          <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> June
+        </NuxtLink>
         <NuxtLink v-if="me?.ok" class="btn" to="/profile">Profile</NuxtLink>
         <NuxtLink class="btn" to="/displayer">Displayer</NuxtLink>
         <a class="btn btnGithub" href="https://github.com/russs95/airbuddy_v2" target="_blank" rel="noopener">
