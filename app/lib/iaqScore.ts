@@ -14,36 +14,44 @@ function tvocDanger(ppb: number): number {
   return Math.min(100, Math.max(0, ppb / 1500 * 100))
 }
 
-function tempDanger(c: number): number {
-  // Ideal 21.5 °C, ±15° → 100
-  return Math.min(100, Math.max(0, Math.abs(c - 21.5) / 15 * 100))
+function tempDanger(c: number, idealTemp = 21.5): number {
+  // Ideal (default 21.5 °C), ±15° → 100
+  return Math.min(100, Math.max(0, Math.abs(c - idealTemp) / 15 * 100))
 }
 
-function humidityDanger(pct: number): number {
-  // Ideal 50 %, ±35% → 100
-  return Math.min(100, Math.max(0, Math.abs(pct - 50) / 35 * 100))
+function humidityDanger(pct: number, idealHumidity = 50): number {
+  // Ideal (default 50 %), ±35% → 100
+  return Math.min(100, Math.max(0, Math.abs(pct - idealHumidity) / 35 * 100))
 }
 
 const WEIGHTS = { co2: 0.50, tvoc: 0.30, temp: 0.10, humidity: 0.10 }
 
+// idealTemp/idealHumidity let a room override the whole-house comfort
+// default (e.g. a nursery or garage) — see rooms_tb.target_temp_c / target_humidity_pct.
 export function calcIaqScore(
   co2: number | null | undefined,
   tvoc: number | null | undefined,
   temp: number | null | undefined,
   humidity: number | null | undefined,
+  idealTemp?: number | null,
+  idealHumidity?: number | null,
 ): number {
   const parts: { score: number; weight: number }[] = []
   if (co2 != null)      parts.push({ score: co2Danger(Number(co2)),      weight: WEIGHTS.co2 })
   if (tvoc != null)     parts.push({ score: tvocDanger(Number(tvoc)),     weight: WEIGHTS.tvoc })
-  if (temp != null)     parts.push({ score: tempDanger(Number(temp)),     weight: WEIGHTS.temp })
-  if (humidity != null) parts.push({ score: humidityDanger(Number(humidity)), weight: WEIGHTS.humidity })
+  if (temp != null)     parts.push({ score: tempDanger(Number(temp), idealTemp ?? undefined),     weight: WEIGHTS.temp })
+  if (humidity != null) parts.push({ score: humidityDanger(Number(humidity), idealHumidity ?? undefined), weight: WEIGHTS.humidity })
   if (!parts.length) return 50
   const totalW = parts.reduce((s, p) => s + p.weight, 0)
   return Math.round(parts.reduce((s, p) => s + p.score * (p.weight / totalW), 0) * 10) / 10
 }
 
 // ── Compute score array from a /api/dashboard/device-trends response ──────────
-export function scoresFromTrends(trends: any): number[] {
+export function scoresFromTrends(
+  trends: any,
+  idealTemp?: number | null,
+  idealHumidity?: number | null,
+): number[] {
   if (!trends?.timestamps?.length) return []
   const result: number[] = []
   for (let i = 0; i < trends.timestamps.length; i++) {
@@ -52,7 +60,7 @@ export function scoresFromTrends(trends: any): number[] {
     const temp     = trends.ahtTemps?.[i]        ?? trends.scdTemps?.[i]
     const humidity = trends.ahtHumidities?.[i]   ?? trends.scdHumidities?.[i]
     if (co2 == null && tvoc == null) continue   // skip if no primary sensor data
-    result.push(calcIaqScore(co2, tvoc, temp, humidity))
+    result.push(calcIaqScore(co2, tvoc, temp, humidity, idealTemp, idealHumidity))
   }
   return result
 }

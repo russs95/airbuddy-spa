@@ -45,6 +45,30 @@ export function useAirbuddyApi() {
     deleteTelemetry: (telemetryId: string | number) =>
       $fetch(`/api/dashboard/telemetry/${telemetryId}`, { ...base, method: 'DELETE' }),
 
+    createRoom: (home_id: string | number, room_name: string) =>
+      $fetch<{ message?: string; room?: Record<string, unknown> }>(
+        '/api/rooms',
+        { ...base, method: 'POST', body: { home_id, room_name } },
+      ),
+
+    renameRoom: (roomId: string | number, room_name: string) =>
+      $fetch(`/api/rooms/${roomId}/rename`, { ...base, method: 'POST', body: { room_name } }),
+
+    deleteRoom: (roomId: string | number) =>
+      $fetch(`/api/rooms/${roomId}`, { ...base, method: 'DELETE' }),
+
+    setRoomComfortTarget: (
+      roomId: string | number,
+      target_temp_c: number | null,
+      target_humidity_pct: number | null,
+    ) =>
+      $fetch(`/api/rooms/${roomId}/comfort-target`, {
+        ...base, method: 'POST', body: { target_temp_c, target_humidity_pct },
+      }),
+
+    assignDeviceRoom: (deviceId: string | number, room_id: string | number | null) =>
+      $fetch(`/api/devices/${deviceId}/assign-room`, { ...base, method: 'POST', body: { room_id } }),
+
     logout: () =>
       $fetch('/api/auth/logout', { ...base, method: 'POST' }),
   }

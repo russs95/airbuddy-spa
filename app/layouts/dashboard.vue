@@ -8,20 +8,30 @@ function toggleDark() {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
 }
 
-const sections = [
-  { id: 'devices',  label: 'Devices',    icon: 'i-lucide-cpu' },
-  { id: 'trends',   label: 'Air Trends', icon: 'i-lucide-activity' },
-  { id: 'battery',  label: 'Battery',    icon: 'i-lucide-battery-charging' },
-  { id: 'location', label: 'Location',   icon: 'i-lucide-map-pin' },
-  { id: 'packets',  label: 'Telemetry',  icon: 'i-lucide-table' },
-  { id: 'account',  label: 'Account',    icon: 'i-lucide-user' },
-]
+const sectionsByPath: Record<string, { id: string, label: string, icon: string }[]> = {
+  '/dashboard': [
+    { id: 'devices',  label: 'Devices',    icon: 'i-lucide-cpu' },
+    { id: 'trends',   label: 'Air Trends', icon: 'i-lucide-activity' },
+    { id: 'battery',  label: 'Battery',    icon: 'i-lucide-battery-charging' },
+    { id: 'location', label: 'Location',   icon: 'i-lucide-map-pin' },
+    { id: 'packets',  label: 'Telemetry',  icon: 'i-lucide-table' },
+    { id: 'account',  label: 'Account',    icon: 'i-lucide-user' },
+  ],
+  '/manage_home': [
+    { id: 'home-info',  label: 'Home Info',          icon: 'i-lucide-info' },
+    { id: 'rooms',      label: 'Rooms',               icon: 'i-lucide-door-open' },
+    { id: 'unassigned', label: 'Unassigned Devices',  icon: 'i-lucide-cpu' },
+  ],
+}
+
+const route = useRoute()
+const sections = computed(() => sectionsByPath[route.path] || [])
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const navItems = computed(() => sections.map(s => ({
+const navItems = computed(() => sections.value.map(s => ({
   label: s.label,
   icon: s.icon,
   onSelect: (e: Event) => { e.preventDefault(); scrollTo(s.id) },
@@ -41,11 +51,11 @@ const displayName = computed(() =>
 <template>
   <UDashboardGroup>
     <UDashboardSidebar collapsible resizable :min-size="14" :default-size="16" :max-size="22">
-      <template #header>
+      <template #header="{ collapsed }">
         <NuxtLink to="/" class="lp:flex lp:items-center lp:gap-2">
-          <img v-if="isDark" src="/svgs/airbuddy-logo-dark.svg" alt="AirBuddy" class="lp:h-7 lp:w-auto lp:hidden lp:lg:block" />
-          <img v-else src="/svgs/airbuddy-logo-light.svg" alt="AirBuddy" class="lp:h-7 lp:w-auto lp:hidden lp:lg:block" />
-          <img src="/svgs/ab-icon.svg" alt="AirBuddy" class="lp:h-7 lp:w-7 lp:lg:hidden" />
+          <img v-if="collapsed" src="/svgs/ab-icon.svg" alt="AirBuddy" class="lp:h-7 lp:w-7" />
+          <img v-else-if="isDark" src="/svgs/airbuddy-logo-dark.svg" alt="AirBuddy" class="lp:h-7 lp:w-auto" />
+          <img v-else src="/svgs/airbuddy-logo-light.svg" alt="AirBuddy" class="lp:h-7 lp:w-auto" />
         </NuxtLink>
       </template>
 

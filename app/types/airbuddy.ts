@@ -46,8 +46,34 @@ export interface Device {
 
 export interface Room {
   room_id: number | string
+  home_id?: number | string
   room_name: string
+  floor?: string | null
+  notes?: string | null
+  target_temp_c?: number | string | null
+  target_humidity_pct?: number | string | null
   devices?: Device[]
+}
+
+// One row per device from /api/dashboard/room-latest.
+export interface RoomLatestDevice {
+  device_id: number | string
+  device_uid: string
+  home_id: number | string
+  room_id: number | string | null
+  last_seen_at?: string | null
+  recorded_at?: string | null
+  received_at?: string | null
+  co2: number | null
+  tvoc: number | null
+  temp: number | null
+  humidity: number | null
+  aqi: number | null
+}
+
+export interface RoomLatestResponse {
+  ok: boolean
+  devices: RoomLatestDevice[]
 }
 
 export interface Home {

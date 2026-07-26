@@ -21,8 +21,8 @@
         >
           {{ theme === "dark" ? "☀️" : "🌙" }}
         </button>
-        <NuxtLink class="btn" to="/dashboard-june">Dashboard</NuxtLink>
-        <NuxtLink class="btn" to="/dashboard">Legacy</NuxtLink>
+        <NuxtLink class="btn" to="/dashboard">Dashboard</NuxtLink>
+        <NuxtLink class="btn" to="/dashboard-legacy">Legacy</NuxtLink>
         <button v-if="!me?.ok" class="btn" @click="doLogin">Login</button>
       </div>
     </header>
