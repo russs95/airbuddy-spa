@@ -194,10 +194,23 @@ const co2Value = computed<number | null>(() => {
   const v = live.value?.ens_eco2 ?? live.value?.scd_co2
   return v != null ? Number(v) : null
 })
-const humidityValue = computed<number | null>(() => {
-  const v = live.value?.aht_humidity ?? live.value?.scd_humidity ?? live.value?.bme_humidity
-  return v != null ? Number(v) : null
-})
+// A humidity reading only counts if it's a real 0–100% value. Devices without a
+// humidity sensor (e.g. a BMP280 read through a BME280 driver) report a pinned
+// 100% (or 0%), which we treat as "not reported".
+function pickHumidity(v: any): number | null {
+  for (const raw of [v?.aht_humidity, v?.scd_humidity, v?.bme_humidity]) {
+    if (raw == null) continue
+    const n = Number(raw)
+    if (Number.isFinite(n) && n > 0 && n < 100) return n
+  }
+  return null
+}
+const humidityValue = computed<number | null>(() => pickHumidity(live.value))
+// Hide the humidity tile once we know the device isn't reporting humidity.
+// While the first reading is still loading (live === null) keep it, so the
+// layout doesn't jump.
+const showHumidityTile = computed(() =>
+  show.humidity && (live.value == null || humidityValue.value != null))
 const tvocValue = computed<number | null>(() => {
   const v = live.value?.ens_tvoc
   return v != null ? Number(v) : null
@@ -254,7 +267,7 @@ watch(live, (liveVal) => {
   }
   push('temp', liveVal.aht_temp ?? liveVal.scd_temp ?? liveVal.bme_temp)
   push('co2', liveVal.ens_eco2 ?? liveVal.scd_co2)
-  push('humidity', liveVal.aht_humidity ?? liveVal.scd_humidity ?? liveVal.bme_humidity)
+  push('humidity', pickHumidity(liveVal))
   push('tvoc', liveVal.ens_tvoc)
 })
 
@@ -354,7 +367,9 @@ function formatLastReading(recorded: string | null | undefined): string {
   if (!recorded) return '—'
   const d = new Date(recorded)
   if (isNaN(d.getTime())) return recorded
-  return d.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  // Include the date so a stale reading (e.g. from days ago) is obvious
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return `${date} · ${formatTime(d)}`
 }
 
 function formatCoords(lat: any, lon: any): string {
@@ -365,7 +380,7 @@ function formatCoords(lat: any, lon: any): string {
 }
 
 function doLogin() {
-  window.location.href = '/api/auth/login'
+  window.location.href = `/api/auth/login?return_to=${encodeURIComponent('/displayer')}`
 }
 </script>
 
@@ -504,7 +519,7 @@ function doLogin() {
     </Teleport>
 
     <!-- ── Kiosk grid ──────────────────────────────────────────────────── -->
-    <div class="grid">
+    <div class="grid" :class="{ noHumidity: !showHumidityTile }">
 
       <!-- Clock tile — top-left, half screen width -->
       <div v-if="show.time" class="tile tileClock">
@@ -550,7 +565,7 @@ function doLogin() {
       </div>
 
       <!-- Humidity tile — row 2, right third -->
-      <div v-if="show.humidity" class="tile tileHumidity" :style="humidityBgStyle(humidityValue)">
+      <div v-if="showHumidityTile" class="tile tileHumidity" :style="humidityBgStyle(humidityValue)">
         <div class="metricValue">{{ humidityValue != null ? Math.round(humidityValue) : '—' }}</div>
         <div class="metricUnit">%</div>
         <div v-if="trendArrow(trendBuffer.humidity)" class="trendArrow" :class="trendClass(trendBuffer.humidity, 0)">{{ trendArrow(trendBuffer.humidity) }}</div>
@@ -640,6 +655,13 @@ function doLogin() {
   gap: 4px;
   background: #0d1117;
   overflow: hidden;
+}
+/* No humidity tile — temp and CO₂ split row 2 in half */
+.grid.noHumidity {
+  grid-template-areas:
+    "clock    clock    clock    device   device   device"
+    "temp     temp     temp     co2      co2      co2"
+    "gps      gps      tvoc     tvoc     aqi      aqi";
 }
 
 /* ── Base tile ───────────────────────────────────────────────────────────────*/

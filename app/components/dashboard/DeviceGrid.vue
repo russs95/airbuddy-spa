@@ -5,9 +5,15 @@ import type { Device } from '~/types/airbuddy'
 const {
   devices, devicesPending, devicesError, devicesErrorMessage,
   selectedDeviceUid, compareDeviceUid, live,
-  selectDevice, selectCompareDevice, isDeviceRecent,
+  selectDevice, selectCompareDevice, deviceActivity,
   openAddDeviceModal, refreshDevices, openDeviceModal,
 } = useDashboard()
+
+const activityDotClass = {
+  live: 'lp:bg-success',
+  recent: 'lp:bg-warning',
+  offline: 'lp:bg-(--ui-text-dimmed)',
+} as const
 </script>
 
 <template>
@@ -62,17 +68,19 @@ const {
         @keydown.enter.space.prevent="selectDevice(device)"
       >
         <div class="lp:flex lp:items-center lp:justify-between lp:gap-2">
-          <div class="lp:font-medium lp:truncate">{{ device.device_name || device.device_uid }}</div>
+          <div class="lp:flex lp:items-center lp:gap-2 lp:min-w-0">
+            <span
+              class="lp:inline-block lp:size-2.5 lp:shrink-0 lp:rounded-full"
+              :class="activityDotClass[deviceActivity(device).level]"
+              :title="deviceActivity(device).title"
+            />
+            <div class="lp:font-medium lp:truncate">{{ device.device_name || device.device_uid }}</div>
+          </div>
           <div class="lp:flex lp:items-center lp:gap-1.5">
             <span
               v-if="selectedDeviceUid === device.device_uid && live?.ens_aqi != null"
               :title="`AQI ${live.ens_aqi}`"
             >{{ aqiEmoji(live.ens_aqi) }}</span>
-            <span
-              class="lp:inline-block lp:size-2 lp:rounded-full"
-              :class="isDeviceRecent(device) ? 'lp:bg-success' : 'lp:bg-(--ui-bg-muted) lp:ring-1 lp:ring-(--ui-border)'"
-              :title="isDeviceRecent(device) ? 'Active — reported in the last 5 minutes' : 'No recent data'"
-            />
             <UButton
               size="xs"
               color="neutral"

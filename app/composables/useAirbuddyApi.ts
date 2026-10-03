@@ -42,6 +42,9 @@ export function useAirbuddyApi() {
         { ...base, method: 'POST' },
       ),
 
+    deleteDevice: (deviceId: string | number) =>
+      $fetch<{ message?: string }>(`/api/devices/${deviceId}`, { ...base, method: 'DELETE' }),
+
     deleteTelemetry: (telemetryId: string | number) =>
       $fetch(`/api/dashboard/telemetry/${telemetryId}`, { ...base, method: 'DELETE' }),
 

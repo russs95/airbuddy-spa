@@ -22,7 +22,6 @@
           {{ theme === "dark" ? "☀️" : "🌙" }}
         </button>
         <NuxtLink class="btn" to="/dashboard">Dashboard</NuxtLink>
-        <NuxtLink class="btn" to="/dashboard-legacy">Legacy</NuxtLink>
         <button v-if="!me?.ok" class="btn" @click="doLogin">Login</button>
       </div>
     </header>
@@ -186,7 +185,7 @@ function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
 }
 function doLogin() {
-  window.location.href = `/api/auth/login?mode=${encodeURIComponent(theme.value)}`
+  window.location.href = `/api/auth/login?mode=${encodeURIComponent(theme.value)}&return_to=${encodeURIComponent('/profile')}`
 }
 
 // ── Session + profile data ────────────────────────────────────────────────────

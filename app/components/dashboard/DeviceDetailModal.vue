@@ -2,9 +2,9 @@
 const {
   deviceModalOpen, activeDevice, deviceKeyValue, deviceKeyError, deviceKeyMessage,
   showDeviceKey, resetPending, copyPending, renamingDevice, renameValue, renamePending,
-  renameError, uidCopied,
+  renameError, uidCopied, deviceDeletePending, deviceDeleteError,
   closeDeviceModal, startRename, cancelRename, saveDeviceName,
-  copyDeviceUid, toggleShowKey, copyDeviceKey, resetDeviceKey,
+  copyDeviceUid, toggleShowKey, copyDeviceKey, resetDeviceKey, deleteDevice,
 } = useDashboard()
 
 const open = computed({
@@ -143,6 +143,25 @@ async function copyInstallCommand() {
         <p class="lp:text-xs lp:text-(--ui-text-muted)">
           Resetting the key will require updating the key on the physical AirBuddy device.
         </p>
+
+        <USeparator />
+
+        <div class="lp:space-y-2">
+          <UAlert v-if="deviceDeleteError" color="error" variant="soft" :title="deviceDeleteError" />
+          <UButton
+            block
+            color="error"
+            variant="solid"
+            icon="i-lucide-trash-2"
+            :loading="deviceDeletePending"
+            :disabled="!activeDevice?.device_id"
+            label="Delete Device"
+            @click="deleteDevice"
+          />
+          <p class="lp:text-xs lp:text-(--ui-text-muted)">
+            Permanently removes this device and all of its readings from your account.
+          </p>
+        </div>
       </div>
     </template>
   </UModal>

@@ -23,7 +23,7 @@
         </button>
         <NuxtLink class="btn" to="/">Home</NuxtLink>
         <NuxtLink class="btn" to="/dashboard">
-          <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> June
+          <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> New Dashboard
         </NuxtLink>
         <NuxtLink v-if="me?.ok" class="btn" to="/profile">Profile</NuxtLink>
         <NuxtLink class="btn" to="/displayer">Displayer</NuxtLink>

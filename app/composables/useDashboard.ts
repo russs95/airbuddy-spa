@@ -516,6 +516,8 @@ function createDashboard() {
   const renamePending = ref(false)
   const renameError = ref('')
   const uidCopied = ref(false)
+  const deviceDeletePending = ref(false)
+  const deviceDeleteError = ref('')
 
   function openDeviceModal(device: Device) {
     activeDevice.value = device
@@ -528,6 +530,8 @@ function createDashboard() {
     renamingDevice.value = false
     renameError.value = ''
     uidCopied.value = false
+    deviceDeletePending.value = false
+    deviceDeleteError.value = ''
   }
   function closeDeviceModal() {
     deviceModalOpen.value = false
@@ -541,6 +545,8 @@ function createDashboard() {
     renamingDevice.value = false
     renameError.value = ''
     uidCopied.value = false
+    deviceDeletePending.value = false
+    deviceDeleteError.value = ''
   }
   function startRename() {
     renameValue.value = activeDevice.value?.device_name || ''
@@ -608,6 +614,27 @@ function createDashboard() {
     }
   }
 
+  async function deleteDevice() {
+    const device = activeDevice.value
+    if (!device?.device_id) return
+    const label = device.device_name || device.device_uid
+    if (!window.confirm(
+      `Delete "${label}" permanently?\n\nThis removes the device, its key and all of its telemetry readings from your account. This cannot be undone.`,
+    )) return
+    try {
+      deviceDeletePending.value = true
+      deviceDeleteError.value = ''
+      await api.deleteDevice(device.device_id)
+      if (compareDeviceUid.value === device.device_uid) compareDeviceUid.value = ''
+      closeDeviceModal()
+      await refreshDevices()
+    } catch (e) {
+      deviceDeleteError.value = apiErrorMessage(e, 'Could not delete device.')
+    } finally {
+      deviceDeletePending.value = false
+    }
+  }
+
   // ── Set Location modal ─────────────────────────────────────────────────────
   const locationModalOpen = ref(false)
   const manualLat = ref('')
@@ -664,16 +691,25 @@ function createDashboard() {
     clearTimeout(routeDebounceTimer)
   })
 
-  function isDeviceRecent(device: Device): boolean {
+  // Activity level from the device's last report: 'live' (< 1 h),
+  // 'recent' (< 24 h) or 'offline'. Uses last_seen_at from /dashboard/devices,
+  // or the selected device's live reading if that's newer.
+  function deviceActivity(device: Device): { level: 'live' | 'recent' | 'offline'; title: string } {
     // nowMs is referenced so this re-evaluates each tick.
-    void nowMs.value
-    if (device.last_seen) {
-      return Date.now() - new Date(device.last_seen).getTime() < 5 * 60 * 1000
-    }
+    const now = nowMs.value
+    let seenMs = NaN
+    const seen = device.last_seen_at || device.last_seen
+    if (seen) seenMs = new Date(seen).getTime()
     if (device.device_uid === selectedDeviceUid.value && live.value?.received_at) {
-      return Date.now() - new Date(live.value.received_at).getTime() < 5 * 60 * 1000
+      const liveMs = new Date(live.value.received_at).getTime()
+      if (!Number.isFinite(seenMs) || liveMs > seenMs) seenMs = liveMs
     }
-    return false
+    if (!Number.isFinite(seenMs)) return { level: 'offline', title: 'No data received yet' }
+    const age = now - seenMs
+    const when = `Last reported ${new Date(seenMs).toLocaleString()}`
+    if (age < 60 * 60 * 1000) return { level: 'live', title: `Active in the last hour — ${when}` }
+    if (age < 24 * 60 * 60 * 1000) return { level: 'recent', title: `Active in the last 24 hours — ${when}` }
+    return { level: 'offline', title: `Inactive for over a day — ${when}` }
   }
 
   return {
@@ -688,7 +724,7 @@ function createDashboard() {
     packetTrends, packetTrendsPending, refreshPacketTrends,
     // selection
     selectedDeviceUid, compareDeviceUid, deviceOptions, selectedDeviceLabel,
-    primaryDeviceName, compareDeviceName, selectDevice, selectCompareDevice, isDeviceRecent,
+    primaryDeviceName, compareDeviceName, selectDevice, selectCompareDevice, deviceActivity,
     // ranges & layout
     universalRange, chartExpanded, mapExpanded, gpsMode,
     packetRange, packetLimit, packetPage,
@@ -714,9 +750,9 @@ function createDashboard() {
     // device modal
     deviceModalOpen, activeDevice, deviceKeyValue, deviceKeyError, deviceKeyMessage,
     showDeviceKey, resetPending, copyPending, renamingDevice, renameValue, renamePending,
-    renameError, uidCopied,
+    renameError, uidCopied, deviceDeletePending, deviceDeleteError,
     openDeviceModal, closeDeviceModal, startRename, cancelRename, saveDeviceName,
-    copyDeviceUid, toggleShowKey, copyDeviceKey, resetDeviceKey,
+    copyDeviceUid, toggleShowKey, copyDeviceKey, resetDeviceKey, deleteDevice,
     // location modal
     locationModalOpen, manualLat, manualLon, locationSavePending, locationSaveError,
     locationSaveOk, openLocationModal, closeLocationModal, saveDeviceLocation,

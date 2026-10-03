@@ -55,13 +55,6 @@ function openDisplayer() {
             to="/manage_home"
           />
           <UButton
-            color="neutral"
-            variant="ghost"
-            icon="i-lucide-layout-dashboard"
-            label="Legacy"
-            to="/dashboard-legacy"
-          />
-          <UButton
             color="primary"
             variant="solid"
             icon="i-lucide-monitor"

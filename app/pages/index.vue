@@ -374,15 +374,18 @@ const copy = computed(() => lang.value === 'id' ? id : en)
 // ─── Auth state ────────────────────────────────────────────────────────────────
 const { data: me } = await useFetch('/api/me', { credentials: 'include' })
 
-const loginHref = computed(() =>
-  me.value?.ok
-    ? '/dashboard'
-    : 'https://buwana.ecobricks.org/en/login.php?app=airb_ca090536efc8&app=airb_ca090536efc8'
-)
 
 // ─── Color mode ───────────────────────────────────────────────────────────────
 const colorMode = useColorMode()
 const isDark = computed(() => colorMode.value === 'dark')
+// Logged in → go to the dashboard; otherwise run the Buwana login flow and
+// land on the dashboard afterwards.
+function onLoginClick() {
+  if (me.value?.ok) return navigateTo('/dashboard')
+  window.location.href =
+    `/api/auth/login?mode=${encodeURIComponent(colorMode.value || 'light')}&return_to=${encodeURIComponent('/dashboard')}`
+}
+
 function toggleDark() {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
 }
@@ -445,11 +448,11 @@ function toggleDark() {
 
         <!-- Login button -->
         <UButton
-          :to="loginHref"
           color="neutral"
           variant="outline"
           size="sm"
           icon="i-lucide-log-in"
+          @click="onLoginClick"
         >
           {{ me?.ok ? 'Dashboard' : 'Login' }}
         </UButton>

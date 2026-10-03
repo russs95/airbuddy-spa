@@ -15,9 +15,13 @@ export function useSession() {
   const isAuthed = computed(() => !!me.value?.ok)
   const colorMode = useColorMode()
 
-  function login(mode?: string) {
+  // After Buwana login the backend returns the user to `returnTo`
+  // (default: the page they logged in from).
+  function login(mode?: string, returnTo?: string) {
     const m = mode ?? (colorMode.value || 'light')
-    window.location.href = `/api/auth/login?mode=${encodeURIComponent(m)}`
+    const back = returnTo ?? window.location.pathname
+    window.location.href =
+      `/api/auth/login?mode=${encodeURIComponent(m)}&return_to=${encodeURIComponent(back)}`
   }
 
   async function logout() {

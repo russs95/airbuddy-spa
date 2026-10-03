@@ -42,6 +42,7 @@ export interface Device {
   room_name?: string
   status?: string
   last_seen?: string
+  last_seen_at?: string | null
 }
 
 export interface Room {
