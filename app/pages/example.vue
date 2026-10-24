@@ -428,6 +428,7 @@
 import AirTrendChart from '~/components/charts/AirTrendChart.vue'
 import LocationMap from '~/components/LocationMap.vue'
 import { scoresFromTrends, iaqColor, iaqLabel as calcIaqLabel, sparklinePoints, sparklineFillPath } from '../lib/iaqScore'
+import { chargeMasFromIna } from '../lib/batteryCurrent'
 
 useHead({ title: "AirBuddy | Lucie's Place" })
 
@@ -756,7 +757,7 @@ const battLevelSeries = computed(() => {
 const battCurrentSeries = computed(() => {
   const t = trends.value
   const series = []
-  if (hasData(t?.inaCurrentMas)) series.push({ name: 'Current (mA)', color: '#3b82f6', values: t.inaCurrentMas })
+  if (hasData(t?.inaCurrentMas)) series.push({ name: 'Current (mA)', color: '#3b82f6', values: chargeMasFromIna(t.inaCurrentMas) })
   return series
 })
 

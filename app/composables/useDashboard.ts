@@ -9,6 +9,7 @@ import type {
   DeviceTrends, LiveReading, Packet,
 } from '~/types/airbuddy'
 import { mergeTimestamps, alignSeries } from '~/lib/mergeTimestamps'
+import { chargeMaFromIna } from '~/lib/batteryCurrent'
 import {
   scoresFromTrends, iaqColor, iaqLabel as calcIaqLabel,
   sparklinePoints, sparklineFillPath,
@@ -243,7 +244,8 @@ function createDashboard() {
   ]))
 
   const battCurrentSeries = computed(() => buildSeries([
-    { key: 'inaCurrentMas', name: 'Current (mA)', c1: DEVICE1_COLORS.battCurrent, c2: DEVICE2_COLORS.battCurrent },
+    // Raw INA219 sign is negative = charging; the chart is "+ charging".
+    { key: 'inaCurrentMas', name: 'Current (mA)', c1: DEVICE1_COLORS.battCurrent, c2: DEVICE2_COLORS.battCurrent, transform: chargeMaFromIna },
   ]))
 
   // ── IAQ composite score ────────────────────────────────────────────────────

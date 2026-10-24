@@ -1150,6 +1150,7 @@
 import AirTrendChart from '~/components/charts/AirTrendChart.vue'
 import LocationMap from '~/components/LocationMap.vue'
 import { mergeTimestamps, alignSeries } from '~/lib/mergeTimestamps'
+import { chargeMasFromIna } from '~/lib/batteryCurrent'
 import { scoresFromTrends, iaqColor, iaqLabel as calcIaqLabel, sparklinePoints, sparklineFillPath } from '../lib/iaqScore'
 
 useHead({ title: 'AirBuddy | Beta Dashboard' })
@@ -1683,10 +1684,10 @@ const battCurrentSeries = computed(() => {
   const mt = mergedTimestamps.value
   const hasCompare = !!compareDeviceUid.value && !!compareTrends.value?.timestamps?.length
   const n1 = hasCompare ? primaryDeviceName.value + ' ' : ''
-  if (hasData(t?.inaCurrentMas)) series.push({ name: n1 + 'Current (mA)', color: DEVICE1_COLORS.battCurrent, values: alignSeries(mt, t.timestamps, t.inaCurrentMas) })
+  if (hasData(t?.inaCurrentMas)) series.push({ name: n1 + 'Current (mA)', color: DEVICE1_COLORS.battCurrent, values: alignSeries(mt, t.timestamps, chargeMasFromIna(t.inaCurrentMas)) })
   if (hasCompare) {
     const c = compareTrends.value
-    if (hasData(c?.inaCurrentMas)) series.push({ name: compareDeviceName.value + ' Current (mA)', color: DEVICE2_COLORS.battCurrent, values: alignSeries(mt, c.timestamps, c.inaCurrentMas) })
+    if (hasData(c?.inaCurrentMas)) series.push({ name: compareDeviceName.value + ' Current (mA)', color: DEVICE2_COLORS.battCurrent, values: alignSeries(mt, c.timestamps, chargeMasFromIna(c.inaCurrentMas)) })
   }
   return series
 })
