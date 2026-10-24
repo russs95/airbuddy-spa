@@ -1,14 +1,13 @@
 <script setup lang="ts">
-// Step-by-step airOS update: one copyable command that refreshes the turtleOS
-// workspace created by install_airOS.sh and runs sync_airOS.sh from it.
+// Step-by-step airOS update: one copyable command, in the same curl form as
+// the first-time install command, that runs sync_airOS.sh straight from GitHub.
 const props = defineProps<{
   version?: string | null
   latest?: string | null
 }>()
 const open = defineModel<boolean>('open', { default: false })
 
-const updateCommand =
-  'cd ~/Documents/AirBuddy/turtleOS && git fetch origin && git reset --hard origin/main && ./scripts/sync_airOS.sh'
+const updateCommand = 'bash <(curl -fsSL https://raw.githubusercontent.com/h2h-project/turtleOS/main/scripts/sync_airOS.sh)'
 
 const copied = ref(false)
 async function copyCommand() {
@@ -68,8 +67,8 @@ async function copyCommand() {
         />
 
         <p class="lp:text-xs lp:text-(--ui-text-muted)">
-          This uses the AirBuddy folder created when you first set up your device. If you get
-          “No such file or directory”, run the first-time setup command from the device settings instead.
+          The script downloads the latest airOS from GitHub and copies it to your AirBuddy. If it says the
+          board has no config yet, run the first-time setup command from the device settings instead.
         </p>
       </div>
     </template>
