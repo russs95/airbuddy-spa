@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FirmwareUpdateModal from '~/components/dashboard/FirmwareUpdateModal.vue'
+
 const {
   deviceModalOpen, activeDevice, deviceKeyValue, deviceKeyError, deviceKeyMessage,
   showDeviceKey, resetPending, copyPending, renamingDevice, renameValue, renamePending,
@@ -6,6 +8,9 @@ const {
   closeDeviceModal, startRename, cancelRename, saveDeviceName,
   copyDeviceUid, toggleShowKey, copyDeviceKey, resetDeviceKey, deleteDevice,
 } = useDashboard()
+const { deviceFirmware } = useLatestFirmware()
+const firmware = computed(() => deviceFirmware(activeDevice.value))
+const updateModalOpen = ref(false)
 
 const open = computed({
   get: () => deviceModalOpen.value,
@@ -102,7 +107,26 @@ async function copyInstallCommand() {
         <div class="lp:grid lp:grid-cols-2 lp:gap-x-6 lp:text-sm">
           <div><strong>Home:</strong> {{ activeDevice?.home_name || '—' }}</div>
           <div><strong>Room:</strong> {{ activeDevice?.room_name || '—' }}</div>
+          <div class="lp:col-span-2">
+            <strong>airOS:</strong> {{ firmware.version ? `v${firmware.version}` : 'unknown' }}
+            <span v-if="firmware.status === 'current'" class="lp:text-(--ui-text-muted)"> · up to date</span>
+          </div>
         </div>
+
+        <UAlert
+          v-if="firmware.status === 'outdated'"
+          class="lp:cursor-pointer"
+          color="warning"
+          variant="soft"
+          icon="i-lucide-arrow-up-circle"
+          :title="`airOS update available: v${firmware.version} → v${firmware.latest}`"
+          description="Click to see how to update your AirBuddy."
+          :actions="[{ label: 'How to update', color: 'warning', variant: 'solid', size: 'xs', onClick: () => { updateModalOpen = true } }]"
+          role="button"
+          tabindex="0"
+          @click="updateModalOpen = true"
+          @keydown.enter.space.prevent="updateModalOpen = true"
+        />
 
         <USeparator />
 
@@ -165,4 +189,10 @@ async function copyInstallCommand() {
       </div>
     </template>
   </UModal>
+
+  <FirmwareUpdateModal
+    v-model:open="updateModalOpen"
+    :version="firmware.version"
+    :latest="firmware.latest"
+  />
 </template>

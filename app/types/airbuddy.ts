@@ -41,6 +41,7 @@ export interface Device {
   home_name?: string
   room_name?: string
   status?: string
+  firmware_version?: string | null
   last_seen?: string
   last_seen_at?: string | null
 }

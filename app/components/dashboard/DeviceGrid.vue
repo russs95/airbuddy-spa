@@ -8,6 +8,7 @@ const {
   selectDevice, selectCompareDevice, deviceActivity,
   openAddDeviceModal, refreshDevices, openDeviceModal,
 } = useDashboard()
+const { deviceFirmware } = useLatestFirmware()
 
 const activityDotClass = {
   live: 'lp:bg-success',
@@ -94,6 +95,18 @@ const activityDotClass = {
         <div class="lp:text-xs lp:text-(--ui-text-muted) lp:truncate">{{ device.device_uid }}</div>
         <div class="lp:text-xs lp:text-(--ui-text-muted) lp:truncate">
           {{ device.home_name || 'No home' }}<span v-if="device.room_name"> · {{ device.room_name }}</span>
+        </div>
+        <div class="lp:flex lp:items-center lp:gap-1.5 lp:text-xs lp:text-(--ui-text-muted)">
+          <span>airOS {{ deviceFirmware(device).version ? `v${deviceFirmware(device).version}` : 'version unknown' }}</span>
+          <UBadge
+            v-if="deviceFirmware(device).status === 'outdated'"
+            size="sm"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-arrow-up-circle"
+            label="Update available"
+            :title="`airOS v${deviceFirmware(device).latest} is available`"
+          />
         </div>
         <UButton
           v-if="selectedDeviceUid && selectedDeviceUid !== device.device_uid"
