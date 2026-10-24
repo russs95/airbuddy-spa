@@ -151,7 +151,7 @@ req.session.user = {
 
 If you store Buwana profile data in `buwana_ref_cache_tb`, add columns for the new fields.
 Without this, a cached row will be missing the new fields even after the user re-logs in
-(depending on your cache-invalidation logic).
+(depending on your cache-invalidation logic)..
 
 ```sql
 ALTER TABLE buwana_ref_cache_tb
