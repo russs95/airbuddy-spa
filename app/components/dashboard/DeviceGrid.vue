@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FirmwareUpdateModal from '~/components/dashboard/FirmwareUpdateModal.vue'
 import { aqiEmoji } from '~/lib/format'
 import type { Device } from '~/types/airbuddy'
 
@@ -9,6 +10,13 @@ const {
   openAddDeviceModal, refreshDevices, openDeviceModal,
 } = useDashboard()
 const { deviceFirmware } = useLatestFirmware()
+
+// Update instructions, opened from a card's "version unknown" / "Update available".
+const updateFor = ref<Device | null>(null)
+const updateModalOpen = computed({
+  get: () => !!updateFor.value,
+  set: (v: boolean) => { if (!v) updateFor.value = null },
+})
 
 const activityDotClass = {
   live: 'lp:bg-success',
@@ -97,15 +105,32 @@ const activityDotClass = {
           {{ device.home_name || 'No home' }}<span v-if="device.room_name"> · {{ device.room_name }}</span>
         </div>
         <div class="lp:flex lp:items-center lp:gap-1.5 lp:text-xs lp:text-(--ui-text-muted)">
-          <span>airOS {{ deviceFirmware(device).version ? `v${deviceFirmware(device).version}` : 'version unknown' }}</span>
+          <template v-if="deviceFirmware(device).version">
+            <span>airOS v{{ deviceFirmware(device).version }}</span>
+            <UBadge
+              v-if="deviceFirmware(device).status === 'outdated'"
+              as="button"
+              size="sm"
+              color="warning"
+              variant="soft"
+              icon="i-lucide-arrow-up-circle"
+              label="Update available"
+              class="lp:cursor-pointer"
+              :title="`airOS v${deviceFirmware(device).latest} is available — click to see how to update`"
+              @click.stop="updateFor = device"
+            />
+          </template>
           <UBadge
-            v-if="deviceFirmware(device).status === 'outdated'"
+            v-else
+            as="button"
             size="sm"
             color="warning"
             variant="soft"
-            icon="i-lucide-arrow-up-circle"
-            label="Update available"
-            :title="`airOS v${deviceFirmware(device).latest} is available`"
+            icon="i-lucide-circle-help"
+            label="airOS version unknown"
+            class="lp:cursor-pointer"
+            title="This device doesn't report its version, so it's likely out of date — click to see how to update"
+            @click.stop="updateFor = device"
           />
         </div>
         <UButton
@@ -120,4 +145,10 @@ const activityDotClass = {
       </div>
     </div>
   </UCard>
+
+  <FirmwareUpdateModal
+    v-model:open="updateModalOpen"
+    :version="deviceFirmware(updateFor).version"
+    :latest="deviceFirmware(updateFor).latest"
+  />
 </template>

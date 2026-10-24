@@ -108,8 +108,21 @@ async function copyInstallCommand() {
           <div><strong>Home:</strong> {{ activeDevice?.home_name || '—' }}</div>
           <div><strong>Room:</strong> {{ activeDevice?.room_name || '—' }}</div>
           <div class="lp:col-span-2">
-            <strong>airOS:</strong> {{ firmware.version ? `v${firmware.version}` : 'unknown' }}
-            <span v-if="firmware.status === 'current'" class="lp:text-(--ui-text-muted)"> · up to date</span>
+            <strong>airOS:</strong>
+            <template v-if="firmware.version">
+              v{{ firmware.version }}
+              <span v-if="firmware.status === 'current'" class="lp:text-(--ui-text-muted)"> · up to date</span>
+            </template>
+            <UButton
+              v-else
+              size="xs"
+              color="warning"
+              variant="soft"
+              icon="i-lucide-circle-help"
+              label="Version unknown — update"
+              title="This device doesn't report its version, so it's likely out of date"
+              @click="updateModalOpen = true"
+            />
           </div>
         </div>
 

@@ -8,8 +8,7 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { default: false })
 
 const updateCommand =
-  'cd ~/Documents/AirBuddy/turtleOS && git fetch origin && git reset --hard origin/main'
-  + ' && PATH="$HOME/Documents/AirBuddy/.tools-venv/bin:$PATH" ./scripts/sync_airOS.sh'
+  'cd ~/Documents/AirBuddy/turtleOS && git fetch origin && git reset --hard origin/main && ./scripts/sync_airOS.sh'
 
 const copied = ref(false)
 async function copyCommand() {
@@ -26,6 +25,11 @@ async function copyCommand() {
         <p v-if="props.version && props.latest">
           This AirBuddy is running <strong>airOS v{{ props.version }}</strong>.
           Version <strong>v{{ props.latest }}</strong> is available.
+        </p>
+        <p v-else-if="!props.version">
+          We couldn't tell which airOS version this AirBuddy is running. Devices only report their
+          version from airOS v2.6.3 onward, so it is almost
+          certainly running an older version and needs updating.
         </p>
 
         <ol class="lp:list-decimal lp:space-y-1 lp:pl-5">
